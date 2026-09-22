@@ -404,11 +404,15 @@ class GuildOcrProcessor {
   }
 
   /**
-   * Gemini Vision 呼叫
+   * Gemini Vision 呼叫（支援 JPG/PNG 自動偵測 MIME，完整錯誤日誌）
    */
   async recognizeWithGemini(base64Image, isVerticalBattleScreen = false) {
     if (!this.geminiApiKey) return null;
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+
+    // 自動偵測 MIME type（JPG 或 PNG）
+    const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const base64Data = base64Image.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
 
     const prompt = isVerticalBattleScreen
       ? `請精確解析這張最強蝸牛公會戰兵種上陣介面截圖：
@@ -427,25 +431,72 @@ class GuildOcrProcessor {
     "pursuit": 21300
   }
 ]`
-      : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列。`;
+      : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列，每筆包含 name, leadership, hp, atk, def, pursuit（數值單位 K）。`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: "image/png", data: base64Data } }
-          ]
-        }]
-      })
-    });
+    let response, data;
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Data } }
+            ]
+          }]
+        })
+      });
+      data = await response.json();
+    } catch (fetchErr) {
+      console.error('[Gemini] 網路請求失敗:', fetchErr);
+      throw fetchErr;
+    }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    // 檢查 API 錯誤回應
+    if (!response.ok || data.error) {
+      const errMsg = data.error?.message || `HTTP ${response.status}`;
+      console.error('[Gemini] API 錯誤:', errMsg, data);
+      throw new Error(`Gemini API 錯誤: ${errMsg}`);
+    }
+
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('[Gemini] 原始回傳:', rawText.slice(0, 200));
+
+    if (!rawText) {
+      console.warn('[Gemini] 回傳內容為空');
+      return null;
+    }
+
+    // 強健的 JSON 擷取（支援 Markdown 包裹、多餘文字）
+    let jsonStr = rawText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
+    // 嘗試找出 JSON 陣列區段
+    const arrMatch = jsonStr.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+    if (arrMatch) jsonStr = arrMatch[0];
+
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // 確保數值為整數（Gemini 有時回傳小數）
+        return parsed.map(m => ({
+          name: m.name || '',
+          leadership: Math.round(Number(m.leadership) || 0),
+          hp: Math.round(Number(m.hp) || 0),
+          atk: Math.round(Number(m.atk) || 0),
+          def: Math.round(Number(m.def) || 0),
+          pursuit: Math.round(Number(m.pursuit) || 0)
+        }));
+      }
+      console.warn('[Gemini] JSON 解析成功但無成員資料:', parsed);
+      return null;
+    } catch (parseErr) {
+      console.error('[Gemini] JSON 解析失敗:', parseErr, 'rawText:', rawText.slice(0, 300));
+      throw parseErr;
+    }
   }
 }
 

@@ -35,14 +35,22 @@ class GuildOcrProcessor {
     // 1. 若有配置 Gemini API Key，調用高精度 AI 多模態辨識
     if (this.geminiApiKey) {
       try {
-        progressCallback(30, '使用 AI 智能視覺高精度辨識中...');
+        progressCallback(30, '🤖 Gemini AI 視覺辨識中，請稍候...');
         const aiResult = await this.recognizeWithGemini(base64Image, isSnailGameScreen);
         if (aiResult && aiResult.length > 0) {
-          progressCallback(100, `AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
+          progressCallback(100, `✅ Gemini AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
           return { success: true, mode: 'AI_VISION', members: aiResult, fileName };
+        } else {
+          progressCallback(35, '⚠️ Gemini 回傳空結果，嘗試備用引擎...');
         }
       } catch (err) {
-        console.warn('Gemini 辨識失敗，轉用本機引擎:', err);
+        const errMsg = err.message || String(err);
+        console.error('[Gemini] 辨識失敗:', errMsg);
+        progressCallback(35, `⚠️ Gemini 錯誤: ${errMsg.slice(0, 60)}`);
+        // 若在 GitHub Pages 且 Gemini 有設定 Key，顯示錯誤而非靜默切換 Tesseract
+        if (window.location.hostname.includes('github.io')) {
+          throw new Error(`Gemini AI 辨識失敗: ${errMsg}`);
+        }
       }
     }
 

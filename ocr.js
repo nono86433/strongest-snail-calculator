@@ -463,31 +463,63 @@ class GuildOcrProcessor {
 ]`
       : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列，每筆包含 name, leadership, hp, atk, def, pursuit（數值單位 K）。`;
 
-    let response, data;
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: base64Data } }
-            ]
-          }]
-        })
-      });
-      data = await response.json();
-    } catch (fetchErr) {
-      console.error('[Gemini] 網路請求失敗:', fetchErr);
-      throw fetchErr;
+    // 支援雙模型輪替 (若主模型 503 忙線自動切換備用模型) + 指數重試
+    const models = ['gemini-2.5-flash', 'gemma-4-26b-a4b-it'];
+    let response = null;
+    let data = null;
+    let lastError = null;
+
+    for (const model of models) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.geminiApiKey}`;
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mimeType, data: base64Data } }
+                ]
+              }]
+            })
+          });
+
+          data = await response.json();
+
+          // 成功取得候選內容
+          if (response.ok && data.candidates && data.candidates.length > 0) {
+            console.log(`[AI] 模型 [${model}] 辨識成功！(嘗試第 ${attempt} 次)`);
+            break;
+          }
+
+          // 若遇到 503 伺服器忙線，稍微延遲後重試
+          if (response.status === 503 || (data && data.error && data.error.code === 503)) {
+            console.warn(`[AI] 模型 [${model}] 暫時忙線 (503)，1秒後自動重試...`);
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+
+          // 其他錯誤則記錄並嘗試下一個模型
+          const errMsg = data?.error?.message || `HTTP ${response.status}`;
+          lastError = new Error(`[${model}] ${errMsg}`);
+          break;
+        } catch (fetchErr) {
+          lastError = fetchErr;
+          console.warn(`[AI] 模型 [${model}] 網路抖動，1秒後重試:`, fetchErr.message);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      if (data && data.candidates && data.candidates.length > 0) {
+        break;
+      }
     }
 
-    // 檢查 API 錯誤回應
-    if (!response.ok || data.error) {
-      const errMsg = data.error?.message || `HTTP ${response.status}`;
-      console.error('[Gemini] API 錯誤:', errMsg, data);
-      throw new Error(`Gemini API 錯誤: ${errMsg}`);
+    if (!data || !data.candidates || data.candidates.length === 0) {
+      console.error('[AI] 所有雲端模型皆無法連線:', lastError);
+      throw lastError || new Error('雲端 AI 伺服器暫時無法連線');
     }
 
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';

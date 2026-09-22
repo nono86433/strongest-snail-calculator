@@ -13,7 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <!-- 客製樣式 -->
-  <link rel="stylesheet" href="styles.css?v=20260922_20">
+  <link rel="stylesheet" href="styles.css?v=20260922_21">
   <script>
     tailwind.config = {
       theme: {
@@ -610,17 +610,6 @@
 
         <!-- 辨識完成後的校對對照表 -->
         <div id="ocr-step-result" class="hidden space-y-4">
-            <div class="flex-1 min-w-0">
-              <p class="text-amber-300 font-semibold text-sm">前端辨識精準度不足 — 數值可能有誤！</p>
-              <p class="text-amber-200/80 text-xs mt-0.5">您目前使用的是 <b>Tesseract.js 前端辨識</b>，對遊戲截圖辨識效果有限。<br>建議設定免費的 <b>Google Gemini API Key</b>，辨識效果與本機 RapidOCR 相同，並支援手機、平板等所有裝置！</p>
-            </div>
-            <div class="flex flex-col gap-1.5 flex-shrink-0">
-              <button onclick="document.getElementById('ocr-tesseract-warning').classList.add('hidden')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition">
-                忽略，手動校對
-              </button>
-            </div>
-          </div>
-
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1">
@@ -1031,7 +1020,7 @@
   </div>
 
   <!-- 載入核心模組 -->
-  <script src="ocr.js?v=20260922_20"></script>
-  <script src="app.js?v=20260922_20"></script>
+  <script src="ocr.js?v=20260922_21"></script>
+  <script src="app.js?v=20260922_21"></script>
 </body>
 </html>

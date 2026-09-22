@@ -11,11 +11,20 @@ class GuildOcrProcessor {
 
   // 內建安全雲端 AI 金鑰 (XOR 混淆動態載入，防靜態爬蟲洩漏保護)
   getSecureKey() {
-    const stored = localStorage.getItem('guild_gemini_key');
-    if (stored && stored.trim()) return stored.trim();
     const encoded = [27, 11, 116, 27, 56, 98, 8, 20, 108, 19, 2, 59, 104, 57, 46, 41, 110, 8, 60, 10, 44, 17, 109, 14, 56, 0, 25, 62, 55, 20, 48, 31, 51, 106, 111, 12, 10, 42, 49, 41, 104, 16, 14, 27, 51, 32, 99, 3, 17, 13, 21, 12, 27];
     const mask = 90;
-    return encoded.map(b => String.fromCharCode(b ^ mask)).join('');
+    const validKey = encoded.map(b => String.fromCharCode(b ^ mask)).join('');
+
+    // 【核心防護】徹底清除所有瀏覽器中殘留的死掉被封鎖舊 Key (AIzaSy...)
+    try {
+      const stored = localStorage.getItem('guild_gemini_key');
+      if (stored && (stored.startsWith('AIzaSy') || stored.length !== validKey.length)) {
+        console.warn('[AI] 偵測到失效舊金鑰殘留，自動抹除並切換至內建有效金鑰');
+        localStorage.removeItem('guild_gemini_key');
+      }
+    } catch(e){}
+
+    return validKey;
   }
 
   setGeminiKey(key) {
@@ -427,10 +436,13 @@ class GuildOcrProcessor {
   async recognizeWithGemini(base64Image, isVerticalBattleScreen = false) {
     if (!this.geminiApiKey) return null;
 
-    // 自動偵測 MIME type（JPG 或 PNG）
-    const mimeMatch = base64Image.match(/^data:(image\/[a-zA-Z]+);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const base64Data = base64Image.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+    // 強健解析 Base64 與 MIME 格式 (相容所有瀏覽器格式)
+    const commaIndex = base64Image.indexOf(',');
+    const header = commaIndex > -1 ? base64Image.slice(0, commaIndex) : '';
+    const base64Data = commaIndex > -1 ? base64Image.slice(commaIndex + 1) : base64Image;
+    const mimeMatch = header.match(/data:([^;]+)/);
+    let mimeType = mimeMatch ? mimeMatch[1].toLowerCase() : 'image/jpeg';
+    if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
 
     const prompt = isVerticalBattleScreen
       ? `請精確解析這張最強蝸牛公會戰兵種上陣介面截圖：

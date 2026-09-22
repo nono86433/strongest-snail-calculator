@@ -504,14 +504,6 @@ class GuildApp {
 
     progressBar.style.width = '100%';
     if (this.pendingOcrResults.length > 0) {
-      // 偵測：若使用 Tesseract 且數值明顯異常，主動提示設定 Gemini
-      const hasAbnormalTesseract = this.pendingOcrResults.some(m =>
-        m._ocrMode === 'FRONTEND_OCR' && (!m.hp || m.hp < 5000 || !m.name)
-      );
-      const noGeminiKey = !localStorage.getItem('guild_gemini_key');
-      if (hasAbnormalTesseract && noGeminiKey && window.location.hostname.includes('github.io')) {
-        this._pendingGeminiPrompt = true;
-      }
       this.showOcrVerificationStep(false);
     } else {
       const isOnlineStatic = window.location.hostname.includes('github.io');
@@ -547,14 +539,8 @@ class GuildApp {
   updateOcrEngineLabel() {
     const el = document.getElementById('ocr-engine-label');
     if (!el) return;
-    const geminiKey = localStorage.getItem('guild_gemini_key');
-    if (geminiKey) {
-      el.textContent = '✨ Gemini 1.5 雲端 AI 視覺 (高精度推薦)';
-      el.className = 'text-amber-300 font-semibold';
-    } else {
-      el.textContent = '自動適配 (本機 RapidOCR / 前端 Tesseract)';
-      el.className = 'text-slate-300';
-    }
+    el.textContent = '✨ Gemini 1.5 雲端 AI 視覺 (高精度)';
+    el.className = 'text-amber-300 font-semibold';
   }
 
   readFileAsDataURL(file) {

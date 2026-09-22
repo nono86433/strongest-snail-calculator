@@ -5,7 +5,10 @@
 
 class GuildOcrProcessor {
   constructor() {
-    this.geminiApiKey = localStorage.getItem('guild_gemini_key') || '';
+    // API Key 已內建，無需手動設定
+    this.geminiApiKey = 'AIzaSyAQWkxNW--BNJJfLBu7gvjQ-xJNuBLJAaQ';
+    // 同步寫入 localStorage 以確保相容
+    localStorage.setItem('guild_gemini_key', this.geminiApiKey);
   }
 
   setGeminiKey(key) {

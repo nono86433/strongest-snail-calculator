@@ -4,6 +4,17 @@
 
 class GuildApp {
   constructor() {
+    // 支援網址靜默設定 Gemini Key (無感設定，不干擾畫面)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlKey = urlParams.get('gemini_key');
+      if (urlKey && urlKey.trim()) {
+        localStorage.setItem('guild_gemini_key', urlKey.trim());
+        if (window.guildOcr) window.guildOcr.setGeminiKey(urlKey.trim());
+        console.log('[AI] 雲端金鑰已靜默更新');
+      }
+    } catch(e){}
+
     this.currentWeek = 1;
     this.weeksData = {}; // { 1: [members...], 2: [members...] }
     this.members = []; // 當前週的成員名單 (依公會長要求，初始為空)
@@ -395,9 +406,15 @@ class GuildApp {
    * 刪除當前週次
    */
   deleteCurrentWeek() {
-    const weekKeys = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
     const targetWeek = this.currentWeek;
 
+    // 【防呆機制】第一週為基礎基準週，絕對不能刪除！
+    if (targetWeek === 1) {
+      alert('【防呆保護】第 1 週為基礎基準週，無法刪除！\n若需重整第 1 週名單，可直接點擊「清空名單」或重新上傳截圖覆蓋。');
+      return;
+    }
+
+    const weekKeys = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
     if (weekKeys.length <= 1) {
       const memberCount = (this.members || []).length;
       const confirmMsg = memberCount > 0 
@@ -1153,6 +1170,22 @@ class GuildApp {
     select.innerHTML = weeks.map(w => `
       <option value="${w}" ${w === this.currentWeek ? 'selected' : ''}>第 ${w} 週</option>
     `).join('');
+
+    // 防呆：更新「刪除本週」按鈕啟用/禁用狀態
+    const delBtn = document.getElementById('btn-delete-week');
+    if (delBtn) {
+      if (this.currentWeek === 1) {
+        delBtn.disabled = true;
+        delBtn.classList.add('opacity-30', 'cursor-not-allowed');
+        delBtn.classList.remove('hover:bg-rose-950/60', 'hover:text-rose-300');
+        delBtn.title = '【防呆保護】第 1 週為基準週次，不可刪除';
+      } else {
+        delBtn.disabled = false;
+        delBtn.classList.remove('opacity-30', 'cursor-not-allowed');
+        delBtn.classList.add('hover:bg-rose-950/60', 'hover:text-rose-300');
+        delBtn.title = `刪除第 ${this.currentWeek} 週名冊`;
+      }
+    }
   }
 
   /**

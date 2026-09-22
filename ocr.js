@@ -5,10 +5,8 @@
 
 class GuildOcrProcessor {
   constructor() {
-    // API Key 已內建，無需手動設定
-    this.geminiApiKey = 'AIzaSyAQWkxNW--BNJJfLBu7gvjQ-xJNuBLJAaQ';
-    // 同步寫入 localStorage 以確保相容
-    localStorage.setItem('guild_gemini_key', this.geminiApiKey);
+    // 從 localStorage 安全載入金鑰（避免寫死在 public repo 被 Google 自動吊銷）
+    this.geminiApiKey = localStorage.getItem('guild_gemini_key') || '';
   }
 
   setGeminiKey(key) {
@@ -45,12 +43,8 @@ class GuildOcrProcessor {
         }
       } catch (err) {
         const errMsg = err.message || String(err);
-        console.error('[Gemini] 辨識失敗:', errMsg);
-        progressCallback(35, `⚠️ Gemini 錯誤: ${errMsg.slice(0, 60)}`);
-        // 若在 GitHub Pages 且 Gemini 有設定 Key，顯示錯誤而非靜默切換 Tesseract
-        if (window.location.hostname.includes('github.io')) {
-          throw new Error(`Gemini AI 辨識失敗: ${errMsg}`);
-        }
+        console.warn('[Gemini] 辨識異常，自動切換至備用辨識流程:', errMsg);
+        progressCallback(35, '啟動備用辨識引擎...');
       }
     }
 

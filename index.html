@@ -13,7 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <!-- 客製樣式 -->
-  <link rel="stylesheet" href="styles.css?v=20260922_13">
+  <link rel="stylesheet" href="styles.css?v=20260922_16">
   <script>
     tailwind.config = {
       theme: {
@@ -64,7 +64,7 @@
           <button onclick="app.addNewWeek(true)" title="複製當前名單至新的一週" class="p-1 hover:bg-slate-700 text-cyan-400 rounded text-xs px-2">
             複製名單
           </button>
-          <button onclick="app.deleteCurrentWeek()" title="刪除當前選取的週次名冊" class="p-1 hover:bg-rose-950/60 text-rose-400 hover:text-rose-300 rounded text-xs px-2 border-l border-slate-700/80 ml-0.5 transition flex items-center gap-1">
+          <button id="btn-delete-week" onclick="app.deleteCurrentWeek()" title="刪除當前選取的週次名冊" class="p-1 hover:bg-rose-950/60 text-rose-400 hover:text-rose-300 rounded text-xs px-2 border-l border-slate-700/80 ml-0.5 transition flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             刪除本週
           </button>
@@ -77,10 +77,7 @@
         </button>
 
         <!-- AI 視覺設定按鈕 -->
-        <button onclick="app.openAiSettingsModal()" class="bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700 text-indigo-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition">
-          <span>✨</span>
-          AI 高精度辨識設定
-        </button>
+        
 
         <!-- 公式設定按鈕 -->
         <button onclick="app.openFormulaModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition">
@@ -1034,7 +1031,7 @@
   </div>
 
   <!-- 載入核心模組 -->
-  <script src="ocr.js?v=20260922_15"></script>
-  <script src="app.js?v=20260922_15"></script>
+  <script src="ocr.js?v=20260922_16"></script>
+  <script src="app.js?v=20260922_16"></script>
 </body>
 </html>

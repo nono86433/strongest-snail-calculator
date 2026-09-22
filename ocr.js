@@ -130,15 +130,18 @@ class GuildOcrProcessor {
         leadCrop = await this.cropAndEnhance(base64Image, 0.05, 0.48, 0.50, 0.68, 160);
         nameCrop = null;
       } else {
-        // 直立全螢幕截圖
-        progressCallback(45, '鎖定四圍屬性欄位...');
-        statsCrop = await this.cropAndEnhance(base64Image, 0.05, 0.765, 0.95, 0.835, 160);
+        // 直立全螢幕截圖（依遊戲 UI 實際比例精確定位）
+        progressCallback(45, '鎖定四圍屬性欄位 (血量/攻擊/防禦/追擊)...');
+        // 四圍屬性位於底部面板上半段 (Y: 82.5% ~ 90.0%)
+        statsCrop = await this.cropAndEnhance(base64Image, 0.04, 0.825, 0.96, 0.900, 150);
         
-        progressCallback(60, '鎖定領導力數值...');
-        leadCrop = await this.cropAndEnhance(base64Image, 0.05, 0.835, 0.50, 0.885, 160);
+        progressCallback(60, '鎖定領導力進度條數值...');
+        // 領導力進度條位於底部面板下半段 (Y: 90.5% ~ 96.5%)
+        leadCrop = await this.cropAndEnhance(base64Image, 0.04, 0.905, 0.55, 0.965, 150);
 
-        progressCallback(75, '鎖定玩家名稱...');
-        nameCrop = await this.cropAndEnhance(base64Image, 0.15, 0.18, 0.85, 0.27, 175);
+        progressCallback(75, '鎖定玩家標註暱稱...');
+        // 玩家暱稱通常標註於棋盤中央或中下方 (Y: 45.0% ~ 78.0%)，避開上方敵軍資訊區
+        nameCrop = await this.cropAndEnhance(base64Image, 0.10, 0.450, 0.90, 0.780, 160);
       }
 
       progressCallback(85, '執行光學字元解析 (OCR)...');

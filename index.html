@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>?貊?銋振</title>
+  <title>蝸牛之家</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS ?舀 Excel ?臬??-->
+  <!-- SheetJS 支援 Excel 匯出入 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Tesseract.js ?舀?Ｙ? OCR 颲刻? -->
+  <!-- Tesseract.js 支援離線 OCR 辨識 -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  <!-- 摰Ｚˊ璅?? -->
+  <!-- 客製樣式 -->
   <link rel="stylesheet" href="styles.css?v=20260922_11">
   <script>
     tailwind.config = {
@@ -32,85 +32,88 @@
 </head>
 <body class="bg-slate-950 text-slate-100 flex flex-col min-h-screen selection:bg-cyan-500 selection:text-white">
 
-  <!-- ?撠甈?-->
+  <!-- 頂部導航欄 -->
   <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-3.5">
     <div class="max-w-[1560px] mx-auto flex flex-wrap items-center justify-between gap-4">
       
-      <!-- 蝟餌絞 Logo ??憿?-->
+      <!-- 系統 Logo 與標題 -->
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
-          ??
+          🐌
         </div>
         <div>
           <h1 class="font-bold text-lg text-white tracking-wide flex items-center gap-2">
-            ?貊?銋振
-            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">?祆?蝞∠?蝟餌絞</span>
+            蝸牛之家
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">公會管理系統</span>
           </h1>
-          <p class="text-xs text-slate-400">?祆??瑟??望?絞?氬?Ｘ香??豢??餅??蝵啣??柴?芸??箄?駁?</p>
+          <p class="text-xs text-slate-400">公會長每週戰力統整・敢死隊員選拔・手動懲罰名單・截圖智能登錄</p>
         </div>
       </div>
 
-      <!-- ?望活???敹?雿?-->
+      <!-- 週次切換與核心操作 -->
       <div class="flex items-center flex-wrap gap-2.5">
-        <!-- ?望活銝??詨 -->
+        <!-- 週次下拉選單 -->
         <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
-          <span class="text-xs text-slate-400 px-2 font-medium">?? ?望活:</span>
+          <span class="text-xs text-slate-400 px-2 font-medium">📅 週次:</span>
           <select id="week-select" class="bg-slate-900 text-cyan-300 font-bold text-sm px-3 py-1 rounded focus:outline-none border border-slate-700">
-            <option value="1">蝚?1 ??/option>
+            <option value="1">第 1 週</option>
           </select>
-          <button onclick="app.addNewWeek(false)" title="???啁?銝?梧?蝛箇?嚗? class="ml-1 p-1 hover:bg-slate-700 text-slate-300 rounded text-xs px-2">
-            + ?圈?          </button>
-          <button onclick="app.addNewWeek(true)" title="銴ˊ?嗅???單???? class="p-1 hover:bg-slate-700 text-cyan-400 rounded text-xs px-2">
-            銴ˊ?
+          <button onclick="app.addNewWeek(false)" title="開啟新的一週（空白名單）" class="ml-1 p-1 hover:bg-slate-700 text-slate-300 rounded text-xs px-2">
+            + 新週
           </button>
-          <button onclick="app.deleteCurrentWeek()" title="?芷?嗅??詨??望活??" class="p-1 hover:bg-rose-950/60 text-rose-400 hover:text-rose-300 rounded text-xs px-2 border-l border-slate-700/80 ml-0.5 transition flex items-center gap-1">
+          <button onclick="app.addNewWeek(true)" title="複製當前名單至新的一週" class="p-1 hover:bg-slate-700 text-cyan-400 rounded text-xs px-2">
+            複製名單
+          </button>
+          <button onclick="app.deleteCurrentWeek()" title="刪除當前選取的週次名冊" class="p-1 hover:bg-rose-950/60 text-rose-400 hover:text-rose-300 rounded text-xs px-2 border-l border-slate-700/80 ml-0.5 transition flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            ?芷?祇?          </button>
+            刪除本週
+          </button>
         </div>
 
-        <!-- ??颲刻?銝餅???-->
+        <!-- 圖片辨識主按鈕 -->
         <button onclick="app.openOcrModal()" class="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm shadow-md">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          銝??颲刻?
+          上傳圖片辨識
         </button>
 
-        <!-- AI 閬死閮剖??? -->
+        <!-- AI 視覺設定按鈕 -->
         <button onclick="app.openAiSettingsModal()" class="bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700 text-indigo-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition">
-          <span>??/span>
-          AI 擃移摨西儘霅身摰?        </button>
+          <span>✨</span>
+          AI 高精度辨識設定
+        </button>
 
-        <!-- ?砍?閮剖??? -->
+        <!-- 公式設定按鈕 -->
         <button onclick="app.openFormulaModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition">
           <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-          ?砍?閮剖?
+          公式設定
         </button>
 
-        <!-- ?臬 Excel -->
+        <!-- 匯出 Excel -->
         <button onclick="app.exportExcel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition">
           <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          ?臬 Excel
+          匯出 Excel
         </button>
 
-        <!-- 銴ˊ?勗 -->
+        <!-- 複製週報 -->
         <button onclick="app.copyReport()" class="btn-gold flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-          銴ˊ?勗
+          複製週報
         </button>
       </div>
     </div>
   </header>
 
-  <!-- 銝餃摰孵捆??-->
+  <!-- 主內容容器 -->
   <main class="max-w-[1560px] mx-auto w-full px-4 sm:px-6 py-5 flex-1 flex flex-col space-y-4">
 
-    <!-- ?蝯梯????∠?? -->
+    <!-- 頂部統計指標卡片區 -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
       <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center space-x-3.5">
         <div class="p-2.5 rounded-lg bg-cyan-950/80 text-cyan-400 border border-cyan-800/50">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
         </div>
         <div>
-          <p class="text-xs text-slate-400">?駁??鈭箸</p>
+          <p class="text-xs text-slate-400">登錄會員人數</p>
           <p id="stat-member-count" class="text-2xl font-bold font-mono text-white">0</p>
         </div>
       </div>
@@ -120,7 +123,7 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
         </div>
         <div>
-          <p class="text-xs text-slate-400">?祆??湧???</p>
+          <p class="text-xs text-slate-400">公會整體均分</p>
           <p id="stat-avg-score" class="text-2xl font-bold font-mono text-cyan-400">0.0</p>
         </div>
       </div>
@@ -130,7 +133,7 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
         <div>
-          <p class="text-xs text-slate-400">蝮賢??啣???</p>
+          <p class="text-xs text-slate-400">總合戰力指標</p>
           <p id="stat-total-power" class="text-2xl font-bold font-mono text-amber-300">0</p>
         </div>
       </div>
@@ -140,266 +143,268 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
         </div>
         <div>
-          <p class="text-xs text-slate-400">?祇梁蜇?啣? MVP</p>
-          <p id="stat-mvp" class="text-lg font-bold text-white truncate max-w-[140px]">?怎</p>
+          <p class="text-xs text-slate-400">本週總戰力 MVP</p>
+          <p id="stat-mvp" class="text-lg font-bold text-white truncate max-w-[140px]">暫無</p>
         </div>
       </div>
     </div>
 
-    <!-- ??撠甈??祆??蝮質” / ?Ｘ香?? / ?脩蔑? -->
+    <!-- 分頁導航欄：公會成員總表 / 敢死隊員名單 / 懲罰名單 -->
     <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
       <button id="tab-btn-main" onclick="app.switchTab('main')" class="tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 bg-cyan-950 text-cyan-300 border border-cyan-800 shadow-sm">
-        <span>??</span>
-        <span>?祆??蝮質”</span>
+        <span>📋</span>
+        <span>公會成員總表</span>
       </button>
       <button id="tab-btn-vanguard" onclick="app.switchTab('vanguard')" class="tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
-        <span>??</span>
-        <span>?Ｘ香??</span>
-        <span class="text-xs px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60 font-mono">??35 鈭?/span>
+        <span>⚔️</span>
+        <span>敢死隊員名單</span>
+        <span class="text-xs px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/60 font-mono">前 35 人</span>
       </button>
       <button id="tab-btn-penalty" onclick="app.switchTab('penalty')" class="tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
-        <span>??</span>
-        <span>?脩蔑?</span>
+        <span>⚖️</span>
+        <span>懲罰名單</span>
         <span id="tab-penalty-badge" class="text-xs px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800/60 font-mono">0</span>
       </button>
     </div>
 
-    <!-- ================= ?? 1嚗???∠蜇銵刻???================= -->
+    <!-- ================= 分頁 1：公會成員總表視圖 ================= -->
     <div id="view-main" class="space-y-4">
-      <!-- 銵冽撌亙??(?? + ?啣?? + 隤芣?) -->
+      <!-- 表格工具列 (搜尋 + 新增成員 + 說明) -->
       <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
         <div class="flex items-center space-x-3 flex-1 min-w-[240px]">
-          <!-- ??獢?-->
+          <!-- 搜尋框 -->
           <div class="relative w-full max-w-xs">
-            <input type="text" id="search-input" placeholder="?????梁迂..." 
+            <input type="text" id="search-input" placeholder="搜尋成員遊戲暱稱..." 
               class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400">
             <svg class="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
-          <span class="text-xs text-slate-400 hidden sm:inline">? ?內嚗??”?剖敹恍?摨?暺??詨澆?湔靽格</span>
+          <span class="text-xs text-slate-400 hidden sm:inline">💡 提示：點擊表頭可快速排序，點擊數值可直接修改</span>
         </div>
 
         <div class="flex items-center space-x-2">
           <button onclick="app.addNewMember()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
             <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            ?啣??桃??
+            新增單筆成員
           </button>
           <button onclick="app.clearAllMembers()" class="px-2.5 py-1.5 rounded-lg hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 text-xs transition">
-            皜征
+            清空
           </button>
         </div>
       </div>
 
-      <!-- 蝛箇???撠?(?嗅??蝛箸?憿舐內嚗靘踹?銝??皜祈岫) -->
+      <!-- 空狀態引導 (當名冊為空時顯示，方便公會長上傳圖片測試) -->
       <div id="table-empty-state" class="bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-4">
         <div class="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-3xl shadow-inner">
-          ?
+          📷
         </div>
         <div class="max-w-md space-y-1">
-          <h3 class="text-lg font-bold text-white">撠頛?鞈?</h3>
+          <h3 class="text-lg font-bold text-white">尚未載入成員資料</h3>
           <p class="text-sm text-slate-400">
-            靘?閬?嚗???澈?箇征?賜???br>
-            隢?乩??單?”?潭???撅祆扳??蝟餌絞撠?儘霅蒂????????
+            依公會長要求，目前資料庫為空白狀態。<br>
+            請直接上傳您的表格截圖或成員屬性截圖，系統將自動辨識並萃取名單與各項數據！
           </p>
         </div>
         <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button onclick="app.openOcrModal()" class="btn-primary px-8 py-3 rounded-xl text-base font-bold flex items-center gap-2 shadow-lg shadow-cyan-500/20 hover:scale-105 transition">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            暺迨銝??颲刻?
+            點此上傳圖片辨識
           </button>
         </div>
-        <p class="text-xs text-slate-500 pt-2">???舀嚗?亙?恍銝?銝?<kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Ctrl + V</kbd> 鞎潔??芸?嚗??湔????啁雯??嚗?/p>
+        <p class="text-xs text-slate-500 pt-2">✨ 支援：直接在畫面上按下 <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Ctrl + V</kbd> 貼上截圖，或直接拖曳圖片到網頁上！</p>
       </div>
 
-      <!-- ??豢?銝餉”??-->
+      <!-- 成員數據主表格 -->
       <div id="table-container" class="hidden bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         <div class="overflow-x-auto">
           <table class="guild-table w-full">
             <thead>
               <tr>
-                <th class="text-center sortable w-24 text-slate-300" onclick="app.handleSort('power_change')" title="???望??撠?瘚桀?憓? (?唳??⊥?閮?NEW)">?望??皜?/th>
-                <th class="text-left sortable w-32" onclick="app.handleSort('name')">??梁迂</th>
-                <th class="sortable w-14" onclick="app.handleSort('leadership')">??</th>
-                <th class="sortable w-16" onclick="app.handleSort('hp')">銵??K)</th>
-                <th class="sortable w-16" onclick="app.handleSort('atk')">?餅?(K)</th>
-                <th class="sortable w-16" onclick="app.handleSort('def')">?脩戌(K)</th>
-                <th class="sortable w-16" onclick="app.handleSort('pursuit')">餈賣?(K)</th>
-                <th class="sortable text-indigo-300 w-14" onclick="app.handleSort('calc_def')">??/th>
-                <th class="sortable text-orange-300 w-14" onclick="app.handleSort('calc_atk')">??/th>
-                <th class="sortable text-amber-300 w-14" onclick="app.handleSort('calc_pick')">??/th>
-                <th class="sortable text-cyan-300 w-16" onclick="app.handleSort('calc_total')">蝮賣??/th>
-                <th class="sortable text-cyan-400 font-bold w-14" onclick="app.handleSort('calc_avg')">??/th>
-                <th class="text-center w-28">?脩蔑?蔭</th>
-                <th class="text-center w-10">??</th>
+                <th class="text-center sortable w-24 text-slate-300" onclick="app.handleSort('power_change')" title="與上週戰力比對之浮動增減 (新成員標註 NEW)">週戰力增減</th>
+                <th class="text-left sortable w-32" onclick="app.handleSort('name')">遊戲暱稱</th>
+                <th class="sortable w-14" onclick="app.handleSort('leadership')">領導</th>
+                <th class="sortable w-16" onclick="app.handleSort('hp')">血量(K)</th>
+                <th class="sortable w-16" onclick="app.handleSort('atk')">攻擊(K)</th>
+                <th class="sortable w-16" onclick="app.handleSort('def')">防禦(K)</th>
+                <th class="sortable w-16" onclick="app.handleSort('pursuit')">追擊(K)</th>
+                <th class="sortable text-indigo-300 w-14" onclick="app.handleSort('calc_def')">防</th>
+                <th class="sortable text-orange-300 w-14" onclick="app.handleSort('calc_atk')">攻</th>
+                <th class="sortable text-amber-300 w-14" onclick="app.handleSort('calc_pick')">選</th>
+                <th class="sortable text-cyan-300 w-16" onclick="app.handleSort('calc_total')">總戰力</th>
+                <th class="sortable text-cyan-400 font-bold w-14" onclick="app.handleSort('calc_avg')">均</th>
+                <th class="text-center w-28">懲罰處置</th>
+                <th class="text-center w-10">操作</th>
               </tr>
             </thead>
             <tbody id="guild-tbody">
-              <!-- ??瘜典銵冽??-->
+              <!-- 動態注入表格列 -->
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ================= ?? 2嚗甇駁??∪??株???================= -->
+    <!-- ================= 分頁 2：敢死隊員名單視圖 ================= -->
     <div id="view-vanguard" class="hidden space-y-4">
-      <!-- ?Ｘ香???刻?閮? -->
+      <!-- 敢死隊頂部資訊條 -->
       <div class="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 p-4 rounded-xl border border-amber-900/40">
         <div class="space-y-1">
           <h2 class="text-base font-bold text-amber-300 flex items-center gap-2">
-            <span>??</span>
-            <span>蝚?<span id="vanguard-week-num">1</span> ???Ｘ香??豢???捆</span>
+            <span>⚔️</span>
+            <span>第 <span id="vanguard-week-num">1</span> 週 敢死隊員選拔陣容</span>
           </h2>
           <p class="text-xs text-slate-400">
-            閬?嚗???望??∩??蜇?啣???摨?撌血??<span class="text-amber-300 font-semibold">?甇駁???30 鈭箝?瘥? 10 鈭箇??</span>嚗?渡 <span class="text-purple-300 font-semibold">??? 5 鈭箝?/span>??          </p>
+            規則：依據本週成員之「總戰力」排序，左側為 <span class="text-amber-300 font-semibold">【敢死隊員 30 人】（每排 10 人直排）</span>，右側為 <span class="text-purple-300 font-semibold">【候補隊員 5 人】</span>。
+          </p>
         </div>
         <div class="flex items-center gap-2">
-          <!-- ???璅∪? -->
+          <!-- 切換看盤模式 -->
           <div class="bg-slate-800 p-0.5 rounded-lg border border-slate-700 flex text-xs">
             <button id="btn-vanguard-mode-grid" onclick="app.setVanguardMode('grid')" class="px-2.5 py-1 rounded-md font-bold bg-amber-950 text-amber-300 border border-amber-800/80 transition">
-              ?? ?湔?雿?
+              📌 直排作戰看盤
             </button>
             <button id="btn-vanguard-mode-table" onclick="app.setVanguardMode('table')" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white transition">
-              ?? ?豢?皜蝮質”
+              📄 數據清單總表
             </button>
           </div>
           <button onclick="app.copyVanguardReport()" class="btn-gold flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold shadow-lg">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-            ?? 銝?菔?鋆賢???          </button>
+            📋 一鍵複製名單
+          </button>
         </div>
       </div>
 
-      <!-- 蝯梯??豢??? -->
+      <!-- 統計數據膠囊 -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="bg-slate-900/70 border border-amber-900/40 rounded-xl p-3.5 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
-            <span class="text-2xl">??儭?/span>
+            <span class="text-2xl">🎖️</span>
             <div>
-              <p class="text-xs text-slate-400 font-medium">?Ｘ香?迤?豢??(1~30??</p>
+              <p class="text-xs text-slate-400 font-medium">敢死隊正選戰力 (1~30名)</p>
               <p id="vanguard-main-power" class="text-base font-bold text-amber-300 font-mono mt-0.5">0</p>
             </div>
           </div>
-          <span id="vanguard-main-count" class="text-xs font-mono text-amber-400/80 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">0 / 30 鈭?/span>
+          <span id="vanguard-main-count" class="text-xs font-mono text-amber-400/80 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">0 / 30 人</span>
         </div>
 
         <div class="bg-slate-900/70 border border-purple-900/40 rounded-xl p-3.5 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
-            <span class="text-2xl">?儭?/span>
+            <span class="text-2xl">🛡️</span>
             <div>
-              <p class="text-xs text-slate-400 font-medium">????啣? (31~35??</p>
+              <p class="text-xs text-slate-400 font-medium">候補隊員戰力 (31~35名)</p>
               <p id="vanguard-sub-power" class="text-base font-bold text-purple-300 font-mono mt-0.5">0</p>
             </div>
           </div>
-          <span id="vanguard-sub-count" class="text-xs font-mono text-purple-400/80 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40">0 / 5 鈭?/span>
+          <span id="vanguard-sub-count" class="text-xs font-mono text-purple-400/80 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40">0 / 5 人</span>
         </div>
 
         <div class="bg-slate-900/70 border border-cyan-900/40 rounded-xl p-3.5 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
-            <span class="text-2xl">??/span>
+            <span class="text-2xl">⚡</span>
             <div>
-              <p class="text-xs text-slate-400 font-medium">??35 鈭箏像?蜇?啣?</p>
+              <p class="text-xs text-slate-400 font-medium">前 35 人平均總戰力</p>
               <p id="vanguard-avg-power" class="text-base font-bold text-cyan-300 font-mono mt-0.5">0</p>
             </div>
           </div>
-          <span id="vanguard-total-count" class="text-xs font-mono text-cyan-400/80 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">??0 鈭?/span>
+          <span id="vanguard-total-count" class="text-xs font-mono text-cyan-400/80 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">共 0 人</span>
         </div>
       </div>
 
-      <!-- ???輯???璇?(?嗆????瘨甇駁?鞈?瑁?銝剛◤蝘餃???＊蝷? -->
+      <!-- 處分替補狀態通知條 (當有成員因取消敢死隊資格執行中被移出時動態顯示) -->
       <div id="vanguard-disqualified-container" class="hidden"></div>
 
-      <!-- 璅∪? 1嚗???啁??方???(撌阡? 30 鈭箏? 3 ?? 10 鈭綽??喲??? 5 鈭箇?? -->
+      <!-- 模式 1：直排作戰看盤視圖 (左邊 30 人切 3 排各 10 人，右邊候補 5 人直排) -->
       <div id="vanguard-grid-view" class="flex flex-col lg:flex-row gap-4">
         
-        <!-- 撌阡?嚗甇駁???30 鈭箏?憛?(3 ??? -->
+        <!-- 左邊：敢死隊員 30 人區塊 (3 排直排) -->
         <div class="flex-1 bg-slate-900/70 border border-amber-900/40 rounded-2xl p-4 shadow-xl space-y-3">
           <div class="flex items-center justify-between border-b border-amber-900/40 pb-2.5">
             <div class="flex items-center gap-2">
-              <span class="p-1.5 rounded-lg bg-amber-950 text-amber-400 border border-amber-800/60 text-sm">??</span>
+              <span class="p-1.5 rounded-lg bg-amber-950 text-amber-400 border border-amber-800/60 text-sm">⚔️</span>
               <div>
-                <h3 class="text-sm font-bold text-amber-300">?Ｘ香?? (甇? 30 鈭?</h3>
-                <p class="text-[11px] text-slate-400">蝮賣???? 30 ??? 3 ?湔?嚗???10 鈭綽?</p>
+                <h3 class="text-sm font-bold text-amber-300">敢死隊員名單 (正選 30 人)</h3>
+                <p class="text-[11px] text-slate-400">總戰力排名前 30 名，切為 3 直排（每排 10 人）</p>
               </div>
             </div>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">3 ??? 10 鈭?/span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">3 排 × 10 人</span>
           </div>
 
-          <!-- 3 ?湔?蝬脫 -->
+          <!-- 3 直排網格 -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <!-- 蝚?1 ??(1 ~ 10 ?? -->
+            <!-- 第 1 排 (1 ~ 10 名) -->
             <div class="space-y-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800">
               <div class="flex items-center justify-between text-xs font-bold text-amber-400/90 border-b border-slate-800 pb-1.5 px-1">
-                <span>蝚砌???(1 ~ 10 ??</span>
-                <span class="text-[10px] text-slate-500 font-mono">10 鈭?/span>
+                <span>第一排 (1 ~ 10 名)</span>
+                <span class="text-[10px] text-slate-500 font-mono">10 人</span>
               </div>
               <div id="vanguard-col-1" class="space-y-1.5">
-                <!-- ??瘜典 -->
+                <!-- 動態注入 -->
               </div>
             </div>
 
-            <!-- 蝚?2 ??(11 ~ 20 ?? -->
+            <!-- 第 2 排 (11 ~ 20 名) -->
             <div class="space-y-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800">
               <div class="flex items-center justify-between text-xs font-bold text-amber-300/80 border-b border-slate-800 pb-1.5 px-1">
-                <span>蝚砌???(11 ~ 20 ??</span>
-                <span class="text-[10px] text-slate-500 font-mono">10 鈭?/span>
+                <span>第二排 (11 ~ 20 名)</span>
+                <span class="text-[10px] text-slate-500 font-mono">10 人</span>
               </div>
               <div id="vanguard-col-2" class="space-y-1.5">
-                <!-- ??瘜典 -->
+                <!-- 動態注入 -->
               </div>
             </div>
 
-            <!-- 蝚?3 ??(21 ~ 30 ?? -->
+            <!-- 第 3 排 (21 ~ 30 名) -->
             <div class="space-y-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800">
               <div class="flex items-center justify-between text-xs font-bold text-amber-200/70 border-b border-slate-800 pb-1.5 px-1">
-                <span>蝚砌???(21 ~ 30 ??</span>
-                <span class="text-[10px] text-slate-500 font-mono">10 鈭?/span>
+                <span>第三排 (21 ~ 30 名)</span>
+                <span class="text-[10px] text-slate-500 font-mono">10 人</span>
               </div>
               <div id="vanguard-col-3" class="space-y-1.5">
-                <!-- ??瘜典 -->
+                <!-- 動態注入 -->
               </div>
             </div>
           </div>
         </div>
 
-        <!-- ?喲?嚗?? 5 鈭箇??+ ?祇梢?閬蝵啣??桀?甈?(銝???芸??) -->
+        <!-- 右邊：候補隊員 5 人直排 + 本週違規懲罰名單專欄 (一頁式截圖包含) -->
         <div class="w-full lg:w-80 xl:w-[340px] flex flex-col gap-3.5">
-          <!-- 銝嚗?? 5 鈭?-->
+          <!-- 上方：候補隊員 5 人 -->
           <div class="bg-slate-900/70 border border-purple-900/40 rounded-2xl p-3.5 shadow-xl space-y-2.5">
             <div class="flex items-center justify-between border-b border-purple-900/40 pb-2">
               <div class="flex items-center gap-2">
-                <span class="p-1 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60 text-xs">?儭?/span>
+                <span class="p-1 rounded-lg bg-purple-950 text-purple-400 border border-purple-800/60 text-xs">🛡️</span>
                 <div>
-                  <h3 class="text-xs font-bold text-purple-300">????</h3>
-                  <p class="text-[10px] text-slate-400">蝮賣?洵 31 ~ 35 ??/p>
+                  <h3 class="text-xs font-bold text-purple-300">候補隊員名單</h3>
+                  <p class="text-[10px] text-slate-400">總戰力第 31 ~ 35 名</p>
                 </div>
               </div>
-              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">5 鈭箇??/span>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">5 人直排</span>
             </div>
 
-            <!-- ???湔? -->
+            <!-- 候補直排 -->
             <div class="space-y-2 bg-slate-950/50 p-2 rounded-xl border border-slate-800">
               <div id="vanguard-col-sub" class="space-y-1.5">
-                <!-- ??瘜典 -->
+                <!-- 動態注入 -->
               </div>
             </div>
           </div>
 
-          <!-- 銝嚗?梢?閬蝵啣??桀?甈?(銝???芸??) -->
+          <!-- 下方：本週違規懲罰名單專欄 (一頁式截圖包含) -->
           <div class="bg-slate-900/70 border border-rose-900/40 rounded-2xl p-3.5 shadow-xl space-y-2.5 flex-1 flex flex-col">
             <div class="flex items-center justify-between border-b border-rose-900/40 pb-2">
               <div class="flex items-center gap-2">
-                <span class="p-1 rounded-lg bg-rose-950 text-rose-400 border border-rose-800/60 text-xs">??</span>
+                <span class="p-1 rounded-lg bg-rose-950 text-rose-400 border border-rose-800/60 text-xs">⚖️</span>
                 <div>
-                  <h3 class="text-xs font-bold text-rose-300">?祇梢?閬蝵啣???/h3>
-                  <p class="text-[10px] text-slate-400">???????閮?/p>
+                  <h3 class="text-xs font-bold text-rose-300">本週違規懲罰名單</h3>
+                  <p class="text-[10px] text-slate-400">處分項目與原因標記</p>
                 </div>
               </div>
-              <span id="vanguard-penalty-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/40">0 鈭箏?蝵?/span>
+              <span id="vanguard-penalty-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/40">0 人受罰</span>
             </div>
 
-            <!-- ?脩蔑?∠?皜 -->
+            <!-- 懲罰卡片清單 -->
             <div class="space-y-2 bg-slate-950/50 p-2 rounded-xl border border-slate-800 flex-1">
               <div id="vanguard-col-penalties" class="space-y-1.5">
-                <!-- ??瘜典 -->
+                <!-- 動態注入 -->
               </div>
             </div>
           </div>
@@ -407,132 +412,133 @@
 
       </div>
 
-      <!-- 璅∪? 2嚗甇駁?摰?豢?銵冽摰孵 (?臬??炎閬? -->
+      <!-- 模式 2：敢死隊完整數據表格容器 (可切換檢視) -->
       <div id="vanguard-table-view" class="hidden bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         <div class="overflow-x-auto">
           <table class="guild-table w-full text-xs">
             <thead>
               <tr>
-                <th class="w-12 text-center">??</th>
-                <th class="w-28 text-center">?圈?頨怠?</th>
-                <th class="text-left">??梁迂</th>
-                <th class="text-right text-cyan-300 font-bold">蝮賣??(????</th>
-                <th class="text-right text-cyan-400 font-bold">??/th>
-                <th class="text-right">????/th>
-                <th class="text-right">銵??K)</th>
-                <th class="text-right">?餅?(K)</th>
-                <th class="text-right">?脩戌(K)</th>
-                <th class="text-right">餈賣?(K)</th>
-                <th class="w-28 text-center">?脩蔑?蔭</th>
+                <th class="w-12 text-center">排名</th>
+                <th class="w-28 text-center">戰隊身分</th>
+                <th class="text-left">遊戲暱稱</th>
+                <th class="text-right text-cyan-300 font-bold">總戰力 (攻+防)</th>
+                <th class="text-right text-cyan-400 font-bold">均</th>
+                <th class="text-right">領導力</th>
+                <th class="text-right">血量(K)</th>
+                <th class="text-right">攻擊(K)</th>
+                <th class="text-right">防禦(K)</th>
+                <th class="text-right">追擊(K)</th>
+                <th class="w-28 text-center">懲罰處置</th>
               </tr>
             </thead>
             <tbody id="vanguard-tbody">
-              <!-- ?????Ｘ香???株? -->
+              <!-- 動態生成敢死隊名單行 -->
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ================= ?? 3嚗蝵啣??株???================= -->
+    <!-- ================= 分頁 3：懲罰名單視圖 ================= -->
     <div id="view-penalty" class="hidden space-y-4">
       
-      <!-- ?餉??脩蔑蝝???-->
+      <!-- 登記懲罰紀錄卡片 -->
       <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <span class="text-rose-400">??</span>
-            <span>???餉??脩蔑蝝??/span>
+            <span class="text-rose-400">⚖️</span>
+            <span>手動登記懲罰紀錄</span>
           </h3>
-          <span class="text-xs text-slate-400">???餉???????嚗????摮敺垢</span>
+          <span class="text-xs text-slate-400">手動登記違規或未達標成員，資料自動保存於後端</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <div>
-            <label class="block text-xs text-slate-300 font-medium mb-1">?蔑??梁迂 <span class="text-rose-400">*</span></label>
-            <input type="text" id="penalty-input-name" list="penalty-member-datalist" placeholder="頛詨????? 
+            <label class="block text-xs text-slate-300 font-medium mb-1">受罰成員暱稱 <span class="text-rose-400">*</span></label>
+            <input type="text" id="penalty-input-name" list="penalty-member-datalist" placeholder="輸入或選擇成員" 
               class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400">
             <datalist id="penalty-member-datalist">
-              <!-- ??詨 -->
+              <!-- 成員選單 -->
             </datalist>
           </div>
 
           <div>
-            <label class="block text-xs text-slate-300 font-medium mb-1">???批捆 / ?</label>
+            <label class="block text-xs text-slate-300 font-medium mb-1">處分內容 / 項目</label>
             <select id="penalty-input-action" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400 font-medium">
-              <option value="霅血?1甈?>霅血?1甈?/option>
-              <option value="霅血?2甈?>霅血?2甈?/option>
-              <option value="???Ｘ香????>???Ｘ香????/option>
+              <option value="警告1次">警告1次</option>
+              <option value="警告2次">警告2次</option>
+              <option value="取消敢死隊資格">取消敢死隊資格</option>
             </select>
           </div>
 
           <div>
-            <label class="block text-xs text-slate-300 font-medium mb-1">?餉??交?</label>
+            <label class="block text-xs text-slate-300 font-medium mb-1">登記日期</label>
             <input type="date" id="penalty-input-date" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400">
           </div>
 
           <div>
-            <label class="block text-xs text-slate-300 font-medium mb-1">?瑁????/label>
+            <label class="block text-xs text-slate-300 font-medium mb-1">執行狀態</label>
             <select id="penalty-input-status" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400 font-medium">
-              <option value="?芸銵?>?芸銵?/option>
-              <option value="?瑁?銝?>?瑁?銝?/option>
-              <option value="撌脤??鋆?">撌脤??鋆?</option>
+              <option value="未執行">未執行</option>
+              <option value="執行中">執行中</option>
+              <option value="已銷假/補救">已銷假/補救</option>
             </select>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs text-slate-300 font-medium mb-1">?脩蔑??璅惜 (?舫??詨?????? <span class="text-rose-400">*</span></label>
+          <label class="block text-xs text-slate-300 font-medium mb-1">懲罰原因標籤 (可點選多個同時勾選) <span class="text-rose-400">*</span></label>
           <div class="flex gap-1.5 mb-2 flex-wrap" id="penalty-form-tags">
-            <button type="button" data-tag="?芣??誘" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?芣??誘')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?芣??誘</button>
-            <button type="button" data-tag="?芣??隞? onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?芣??隞?)" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?芣??隞?/button>
-            <button type="button" data-tag="?芣??望" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?芣??望')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?芣??望</button>
-            <button type="button" data-tag="?芷?蝵桀蝔? onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?芷?蝵桀蝔?)" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?芷?蝵桀蝔?/button>
-            <button type="button" data-tag="頝冽??啣仃?? onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '頝冽??啣仃??)" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">頝冽??啣仃??/button>
-            <button type="button" data-tag="?啣??芷?璅? onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?啣??芷?璅?)" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?啣??芷?璅?/button>
-            <button type="button" data-tag="?芷???隞? onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '?芷???隞?)" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">?芷???隞?/button>
+            <button type="button" data-tag="未打金令" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '未打金令')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">未打金令</button>
+            <button type="button" data-tag="未打銀令" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '未打銀令')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">未打銀令</button>
+            <button type="button" data-tag="未打週戰" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '未打週戰')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">未打週戰</button>
+            <button type="button" data-tag="未配置兵種" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '未配置兵種')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">未配置兵種</button>
+            <button type="button" data-tag="跨服戰失聯" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '跨服戰失聯')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">跨服戰失聯</button>
+            <button type="button" data-tag="戰力未達標" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '戰力未達標')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">戰力未達標</button>
+            <button type="button" data-tag="未配合指令" onclick="app.togglePenaltyTag('penalty-input-reason', 'penalty-form-tags', '未配合指令')" class="reason-tag text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">未配合指令</button>
           </div>
           <div class="flex gap-3">
-            <input type="text" id="penalty-input-reason" placeholder="隢‵撖怠擃?閬????酉隤芣?..." 
+            <input type="text" id="penalty-input-reason" placeholder="請填寫具體違規原因或備註說明..." 
               class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-400">
             <button onclick="app.addPenaltyRecord()" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              蝣箄??餉??脩蔑
+              確認登記懲罰
             </button>
           </div>
         </div>
 
       </div>
 
-      <!-- ?脩蔑皜?”撌亙??-->
+      <!-- 懲罰清單列表工具列 -->
       <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
         <div class="flex items-center space-x-2 text-xs text-slate-400">
-          <span>?梁閮?<b id="penalty-total-count" class="text-rose-400 font-mono">0</b> 蝑蝵啣???/span>
+          <span>共登記 <b id="penalty-total-count" class="text-rose-400 font-mono">0</b> 筆懲罰名單</span>
         </div>
         <div class="flex items-center gap-2">
           <button onclick="app.copyPenaltyReport()" class="btn-gold flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold shadow">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-            ?? 銝?菔?鋆賣蝵啣??          </button>
+            📋 一鍵複製懲罰公告
+          </button>
         </div>
       </div>
 
-      <!-- ?脩蔑?銵冽 -->
+      <!-- 懲罰名單表格 -->
       <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         <div class="overflow-x-auto">
           <table class="guild-table w-full text-xs">
             <thead>
               <tr>
                 <th class="w-12 text-center">#</th>
-                <th class="w-36 text-left">??梁迂</th>
-                <th class="text-left">?脩蔑???酉</th>
-                <th class="w-36 text-left">???批捆</th>
-                <th class="w-28 text-center">?餉??交?</th>
-                <th class="w-28 text-center">???/th>
-                <th class="w-24 text-center">??</th>
+                <th class="w-36 text-left">成員暱稱</th>
+                <th class="text-left">懲罰原因備註</th>
+                <th class="w-36 text-left">處分內容</th>
+                <th class="w-28 text-center">登記日期</th>
+                <th class="w-28 text-center">狀態</th>
+                <th class="w-24 text-center">操作</th>
               </tr>
             </thead>
             <tbody id="penalty-tbody">
-              <!-- ?????脩蔑銵?-->
+              <!-- 動態生成懲罰行 -->
             </tbody>
           </table>
         </div>
@@ -542,24 +548,24 @@
 
   </main>
 
-  <!-- ?偏 -->
+  <!-- 頁尾 -->
   <footer class="border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
-    ?撘瑁???絞閮?颲刻?蝞∠?撌亙 &copy; 2026 ???砍摰?Ｙ???
+    最強蝸牛公會數據統計與辨識管理工具 &copy; 2026 ・ 本地安全離線運行
   </footer>
 
-  <!-- ================= 敶? 1嚗????唾?颲刻??∪?銝剖? ================= -->
+  <!-- ================= 彈窗 1：圖片上傳與辨識校對中心 ================= -->
   <div id="ocr-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
       
-      <!-- 敶?? -->
+      <!-- 彈窗頂部 -->
       <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center space-x-2.5">
           <div class="p-2 bg-cyan-950 text-cyan-400 rounded-lg">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
           <div>
-            <h2 class="font-bold text-white text-base">銝?芸???質儘霅?/h2>
-            <p class="text-xs text-slate-400">?舀 Excel 銵冽?芸????脣?皜?芸??犖撅祆折??/p>
+            <h2 class="font-bold text-white text-base">上傳截圖與智能辨識</h2>
+            <p class="text-xs text-slate-400">支援 Excel 表格截圖、遊戲內成員清單截圖或個人屬性面板</p>
           </div>
         </div>
         <button onclick="app.closeModal('ocr-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
@@ -567,129 +573,130 @@
         </button>
       </div>
 
-      <!-- 敶??批捆? -->
+      <!-- 彈窗內容區 -->
       <div class="p-6 overflow-y-auto flex-1 space-y-5">
 
-        <!-- 瑼??豢? / ?? (?芷?憪?) -->
+        <!-- 檔案選擇 / 拖曳區 (未開始時) -->
         <div id="ocr-upload-zone" class="border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-xl p-8 text-center cursor-pointer transition bg-slate-950/50"
              onclick="document.getElementById('file-input').click()">
           <input type="file" id="file-input" accept="image/*" multiple class="hidden" onchange="app.handleImageUpload(this.files)">
           <div class="flex flex-col items-center space-y-2">
             <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-            <p class="font-medium text-white text-sm">暺??詨??芸?瑼?嚗銝甈⊿??撘蛛?嚗?????單迨</p>
-            <p class="text-xs text-slate-400">鈭血?冽迨?湔??<kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-300">Ctrl + V</kbd> 鞎潔??芸?</p>
+            <p class="font-medium text-white text-sm">點擊選取截圖檔案（可一次選取多張），或拖曳圖片至此</p>
+            <p class="text-xs text-slate-400">亦可在此直接按 <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-300">Ctrl + V</kbd> 貼上截圖</p>
             <div class="pt-2 text-xs text-slate-500">
-              ? ?舀?刻撟蝔格???典?甈???祆?銵冽?芸?嚗頂蝯梯???儘霅?            </div>
+              💡 支援全螢幕兵種截圖、局部底欄截圖或公會表格截圖，系統自動動態辨識
+            </div>
           </div>
           <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
             <span class="flex items-center gap-1.5">
               <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>颲刻?撘?嚗?span id="ocr-engine-label" class="text-slate-300">?芸??拚? (?祆? RapidOCR / ?垢 Tesseract)</span></span>
+              <span>辨識引擎：<span id="ocr-engine-label" class="text-slate-300">自動適配 (本機 RapidOCR / 前端 Tesseract)</span></span>
             </span>
             <button type="button" onclick="event.stopPropagation(); app.promptGeminiApiKey()" class="text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 transition">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-              閮剖? Gemini AI ?脩垢? (?璈撩?)
+              設定 Gemini AI 雲端金鑰 (免本機伺服器)
             </button>
           </div>
         </div>
 
-        <!-- 颲刻?銝剖??怨??脣漲???-->
+        <!-- 辨識中動畫與進度狀態 -->
         <div id="ocr-step-loading" class="hidden space-y-4 py-8 text-center">
           <div class="inline-flex p-4 rounded-full bg-cyan-950/60 border border-cyan-800 text-cyan-400 animate-pulse">
             <svg class="w-8 h-8 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           </div>
           <div>
-            <p id="ocr-status-text" class="text-sm font-semibold text-white">甇??? OCR ??摮?????..</p>
-            <p class="text-xs text-slate-400 mt-1">甇?????甈?嚗????脫蝔晞?撠?????蝳西?餈賣?...</p>
+            <p id="ocr-status-text" class="text-sm font-semibold text-white">正在啟動 OCR 與文字分析引擎...</p>
+            <p class="text-xs text-slate-400 mt-1">正在掃描列與欄位，提取遊戲暱稱、領導力、血量、攻擊、防禦與追擊...</p>
           </div>
-          <!-- ?脣漲璇?-->
+          <!-- 進度條 -->
           <div class="max-w-md mx-auto w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
             <div id="ocr-progress-bar" class="bg-gradient-to-r from-cyan-500 to-indigo-500 h-2.5 rounded-full transition-all duration-300" style="width: 20%"></div>
           </div>
         </div>
 
-        <!-- 颲刻?摰?敺??∪?撠銵?-->
+        <!-- 辨識完成後的校對對照表 -->
         <div id="ocr-step-result" class="hidden space-y-4">
-
-          <!-- ?? Tesseract 颲刻??啣虜霅血?璈怠?嚗 app.js ?批憿舐內/?梯?嚗?-->
+          <!-- ⚠️ Tesseract 辨識異常警告橫幅（由 app.js 控制顯示/隱藏） -->
           <div id="ocr-tesseract-warning" class="hidden bg-amber-950/60 border border-amber-500/60 rounded-xl p-3 flex items-start gap-3">
-            <div class="text-amber-400 text-xl flex-shrink-0">??</div>
+            <div class="text-amber-400 text-xl flex-shrink-0">⚠️</div>
             <div class="flex-1 min-w-0">
-              <p class="text-amber-300 font-semibold text-sm">?垢颲刻?蝎暹?摨虫?頞????詨澆?賣?隤歹?</p>
-              <p class="text-amber-200/80 text-xs mt-0.5">?函?蝙?函???<b>Tesseract.js ?垢颲刻?</b>嚗???芸?颲刻???????br>撱箄降閮剖??祥??<b>Google Gemini API Key</b>嚗儘霅????祆? RapidOCR ?詨?嚗蒂?舀???像?輻????蝵殷?</p>
+              <p class="text-amber-300 font-semibold text-sm">前端辨識精準度不足 — 數值可能有誤！</p>
+              <p class="text-amber-200/80 text-xs mt-0.5">您目前使用的是 <b>Tesseract.js 前端辨識</b>，對遊戲截圖辨識效果有限。<br>建議設定免費的 <b>Google Gemini API Key</b>，辨識效果與本機 RapidOCR 相同，並支援手機、平板等所有裝置！</p>
             </div>
             <div class="flex flex-col gap-1.5 flex-shrink-0">
               <button onclick="app.promptGeminiApiKey()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg text-xs transition whitespace-nowrap">
-                ??蝡閮剖? Gemini Key
+                ✨ 立即設定 Gemini Key
               </button>
               <button onclick="document.getElementById('ocr-tesseract-warning').classList.add('hidden')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition">
-                敹賜嚗??撠?              </button>
+                忽略，手動校對
+              </button>
             </div>
           </div>
 
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="text-xs font-semibold px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1">
-                ??颲刻???
+                ✓ 辨識成功
               </span>
-              <span id="ocr-detected-count" class="text-xs text-slate-300 font-mono">????0 蝑?/span>
+              <span id="ocr-detected-count" class="text-xs text-slate-300 font-mono">抓取到 0 筆</span>
             </div>
-            <span class="text-xs text-amber-400">? ?∪??內嚗???港遙銝?詨澆蝡靽格敺株矽</span>
+            <span class="text-xs text-amber-400">💡 校對提示：點擊右側任一數值可立即修改微調</span>
           </div>
 
-          <!-- 撌血?撠嚗椰???葬???喲?霅?箇?銵冽 -->
+          <!-- 左右分割對照：左邊原圖縮圖，右邊識別出的表格 -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[440px]">
             
-            <!-- 撌血???汗 (?舐葬?暹炎?伐?????喳?訾葉?) -->
+            <!-- 左側原圖預覽 (可縮放檢查，連動右側選中成員) -->
             <div class="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
               <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 text-xs text-slate-400 flex flex-col gap-1.5">
                 <div class="flex justify-between items-center">
-                  <span class="font-semibold text-slate-200">???芸?撠</span>
+                  <span class="font-semibold text-slate-200">原始截圖對照</span>
                   <div class="flex items-center gap-1.5">
-                    <button id="ocr-prev-btn" onclick="app.prevPendingMember()" title="敹急?? ?????? class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-cyan-400 rounded text-xs font-bold transition">? 銝?撘?/button>
+                    <button id="ocr-prev-btn" onclick="app.prevPendingMember()" title="快捷鍵: ← 或 ↑" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-cyan-400 rounded text-xs font-bold transition">◀ 上一張</button>
                     <span class="text-xs font-mono text-slate-300"><b id="ocr-active-index" class="text-cyan-400">1</b>/<span id="ocr-total-count">0</span></span>
-                    <button id="ocr-next-btn" onclick="app.nextPendingMember()" title="敹急?? ?????? class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-cyan-400 rounded text-xs font-bold transition">銝?撘???/button>
+                    <button id="ocr-next-btn" onclick="app.nextPendingMember()" title="快捷鍵: → 或 ↓" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-cyan-400 rounded text-xs font-bold transition">下一張 ▶</button>
                   </div>
                 </div>
                 <div class="flex justify-between items-center text-[11px] text-slate-400">
-                  <span id="ocr-active-filename" class="truncate max-w-[180px]" title="?嗅??芸?瑼?">?芾??交??/span>
-                  <button onclick="app.zoomActiveImage()" class="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-0.5">?? 暺迨?曉之瑼Ｘ</button>
+                  <span id="ocr-active-filename" class="truncate max-w-[180px]" title="當前截圖檔名">未載入截圖</span>
+                  <button onclick="app.zoomActiveImage()" class="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-0.5">🔍 點此放大檢查</button>
                 </div>
               </div>
               <div class="flex-1 overflow-auto p-2 bg-black/40 flex items-center justify-center relative group cursor-zoom-in" onclick="app.zoomActiveImage()">
                 <img id="ocr-preview-image" src="" alt="OCR Preview" class="max-w-full max-h-full h-auto rounded border border-slate-800 shadow-md transition-transform group-hover:scale-[1.02]">
-                <span class="absolute bottom-3 bg-black/70 text-slate-300 text-[10px] px-2 py-0.5 rounded pointer-events-none opacity-0 group-hover:opacity-100 transition">暺??曉之瑼Ｚ?</span>
+                <span class="absolute bottom-3 bg-black/70 text-slate-300 text-[10px] px-2 py-0.5 rounded pointer-events-none opacity-0 group-hover:opacity-100 transition">點擊放大檢視</span>
               </div>
             </div>
 
-            <!-- ?喳??蝯??舐楊頛航”??-->
+            <!-- 右側抓取結果可編輯表格 -->
             <div class="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
               <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 text-xs text-slate-400 flex justify-between items-center">
-                <span>??蝯??∪?皜 (暺隞颱?????椰?湔???啣虜?潛?獢郎蝷?</span>
-                <span class="text-[10px] text-slate-500 font-mono">?舀?孵??萄翰????/span>
+                <span>抓取結果校對清單 (點選任一列即時切換左側截圖，異常值紅框警示)</span>
+                <span class="text-[10px] text-slate-500 font-mono">支援方向鍵快速切換</span>
               </div>
               <div class="flex-1 overflow-auto" id="ocr-table-container">
                 <table class="w-full text-xs">
                   <thead class="bg-slate-900 sticky top-0 border-b border-slate-800 text-slate-400 z-10">
                     <tr>
                       <th class="p-2 text-center w-8">#</th>
-                      <th class="p-2 text-left">?梁迂</th>
-                      <th class="p-2 text-right">????/th>
-                      <th class="p-2 text-right">銵??K)</th>
-                      <th class="p-2 text-right">?餅?(K)</th>
-                      <th class="p-2 text-right">?脩戌(K)</th>
-                      <th class="p-2 text-right">餈賣?(K)</th>
-                      <th class="p-2 text-right text-indigo-300">??/th>
-                      <th class="p-2 text-right text-orange-300">??/th>
-                      <th class="p-2 text-right text-amber-300">??/th>
-                      <th class="p-2 text-right text-cyan-300">蝮?/th>
-                      <th class="p-2 text-right text-cyan-400 font-bold">??/th>
-                      <th class="p-2 text-center w-12">瑼Ｚ?</th>
+                      <th class="p-2 text-left">暱稱</th>
+                      <th class="p-2 text-right">領導力</th>
+                      <th class="p-2 text-right">血量(K)</th>
+                      <th class="p-2 text-right">攻擊(K)</th>
+                      <th class="p-2 text-right">防禦(K)</th>
+                      <th class="p-2 text-right">追擊(K)</th>
+                      <th class="p-2 text-right text-indigo-300">防</th>
+                      <th class="p-2 text-right text-orange-300">攻</th>
+                      <th class="p-2 text-right text-amber-300">選</th>
+                      <th class="p-2 text-right text-cyan-300">總</th>
+                      <th class="p-2 text-right text-cyan-400 font-bold">均</th>
+                      <th class="p-2 text-center w-12">檢視</th>
                       <th class="p-2 text-center w-8"></th>
                     </tr>
                   </thead>
                   <tbody id="ocr-verify-tbody">
-                    <!-- ?∪?銵?-->
+                    <!-- 校對行 -->
                   </tbody>
                 </table>
               </div>
@@ -697,14 +704,14 @@
 
           </div>
 
-          <!-- 撖怠???? -->
+          <!-- 寫入動作按鈕 -->
           <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
             <button onclick="app.closeModal('ocr-modal')" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
-              ??
+              取消
             </button>
             <button onclick="app.applyOcrResults('merge')" class="btn-primary px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              蝣箄?銝血神?亙????(??閬? / ?唬犖餈賢?)
+              確認並寫入公會名冊 (同名覆蓋 / 新人追加)
             </button>
           </div>
 
@@ -715,13 +722,13 @@
     </div>
   </div>
 
-  <!-- ================= 敶? 2嚗撘閮??閮剖? ================= -->
+  <!-- ================= 彈窗 2：公式自訂與參數設定 ================= -->
   <div id="formula-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center space-x-2">
-          <span class="text-indigo-400 text-lg">?妙</span>
-          <h2 class="font-bold text-white text-base">閮??砍??閮剖?</h2>
+          <span class="text-indigo-400 text-lg">🧮</span>
+          <h2 class="font-bold text-white text-base">計算公式參數設定</h2>
         </div>
         <button onclick="app.closeModal('formula-modal')" class="text-slate-400 hover:text-white">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -730,65 +737,66 @@
 
       <div class="p-6 space-y-4 text-sm">
         <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
-          ?祆??瑟憟踝?蝟餌絞撌脖??扳???典?箇??砍???敺?臭誑?寞?撖阡?閬??冽迨隤踵??嚗矽?游?????⊥?潭?蝡?閮???        </div>
+          公會長您好！系統已依照截圖反推出基礎公式。稍後您可以根據實際規則在此調整倍率，調整後所有成員數值會立即重新計算。
+        </div>
 
         <div class="space-y-3">
-          <!-- ?脩??砍? -->
+          <!-- 防的公式 -->
           <div>
             <label class="block text-xs font-medium text-slate-300 mb-1">
-              ?儭????蝞撘?<code class="text-indigo-300 font-mono">銵??K) / ?斗 + ?脩戌(K)</code>
+              🛡️ 【防】計算公式：<code class="text-indigo-300 font-mono">血量(K) / 除數 + 防禦(K)</code>
             </label>
             <div class="flex items-center space-x-2">
-              <span class="text-xs text-slate-400">?斗:</span>
+              <span class="text-xs text-slate-400">除數:</span>
               <input type="number" id="input-formula-hp-div" class="bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-white w-24 font-mono text-sm focus:border-cyan-400 focus:outline-none" value="15">
-              <span class="text-xs text-slate-500">(?桀??芸???身??15)</span>
+              <span class="text-xs text-slate-500">(目前截圖反推預設為 15)</span>
             </div>
           </div>
 
-          <!-- ?餌??砍? -->
+          <!-- 攻的公式 -->
           <div>
             <label class="block text-xs font-medium text-slate-300 mb-1">
-              ?? ???蝞撘?<code class="text-orange-300 font-mono">?餅?(K) * ?? + 餈賣?(K)</code>
+              ⚔️ 【攻】計算公式：<code class="text-orange-300 font-mono">攻擊(K) * 倍率 + 追擊(K)</code>
             </label>
             <div class="flex items-center space-x-2">
-              <span class="text-xs text-slate-400">??:</span>
+              <span class="text-xs text-slate-400">倍率:</span>
               <input type="number" step="0.1" id="input-formula-atk-mult" class="bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-white w-24 font-mono text-sm focus:border-cyan-400 focus:outline-none" value="1.5">
-              <span class="text-xs text-slate-500">(?桀??芸???身??1.5)</span>
+              <span class="text-xs text-slate-500">(目前截圖反推預設為 1.5)</span>
             </div>
           </div>
 
-          <!-- 蝮賜??砍?隤芣? -->
+          <!-- 總的公式說明 -->
           <div class="pt-1 border-t border-slate-800">
             <p class="text-xs text-slate-400">
-              ?? ?蜇??蝞撘?<code class="text-cyan-300 font-mono">??+ ??/code>
+              📊 【總】計算公式：<code class="text-cyan-300 font-mono">攻 + 防</code>
             </p>
           </div>
 
-          <!-- ???砍????賊? -->
+          <!-- 均的公式與小數點 -->
           <div>
             <label class="block text-xs font-medium text-slate-300 mb-1">
-              ? ????蝞撘?<code class="text-cyan-400 font-mono">蝮?/ ????/code>
+              🎯 【均】計算公式：<code class="text-cyan-400 font-mono">總 / 領導力</code>
             </label>
             <div class="flex items-center space-x-2">
-              <span class="text-xs text-slate-400">靽?撠雿:</span>
+              <span class="text-xs text-slate-400">保留小數位數:</span>
               <input type="number" id="input-formula-decimals" class="bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-white w-24 font-mono text-sm focus:border-cyan-400 focus:outline-none" value="1">
             </div>
           </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-4 border-t border-slate-800">
-          <button onclick="app.closeModal('formula-modal')" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white">??</button>
-          <button onclick="app.saveFormulaConfig()" class="btn-primary px-5 py-2 rounded-lg text-xs font-bold">?脣?銝阡?蝞銵?/button>
+          <button onclick="app.closeModal('formula-modal')" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white">取消</button>
+          <button onclick="app.saveFormulaConfig()" class="btn-primary px-5 py-2 rounded-lg text-xs font-bold">儲存並重算全表</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ================= 敶? 7嚗??⊥?撠?鞈??⊥迤隞 ================= -->
+  <!-- ================= 彈窗 7：成員截圖核對與資料校正介面 ================= -->
   <div id="member-verify-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
       
-      <!-- ?璅??翰???極?瑕? -->
+      <!-- 頂部標題與快速切換工具列 -->
       <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
         <div class="flex items-center space-x-3">
           <div class="p-1.5 bg-cyan-950 text-cyan-400 rounded-lg border border-cyan-800/60">
@@ -796,19 +804,20 @@
           </div>
           <div>
             <h3 class="font-bold text-white text-base flex items-center gap-2">
-              <span>??芸??詨????甇?/span>
-              <span id="verify-member-badge" class="text-xs px-2 py-0.5 rounded font-mono font-normal bg-slate-800 text-slate-300 border border-slate-700">蝚?<b id="verify-cur-num" class="text-cyan-400">1</b> / <b id="verify-total-num">43</b> 雿?/span>
+              <span>成員截圖核對與資料校正</span>
+              <span id="verify-member-badge" class="text-xs px-2 py-0.5 rounded font-mono font-normal bg-slate-800 text-slate-300 border border-slate-700">第 <b id="verify-cur-num" class="text-cyan-400">1</b> / <b id="verify-total-num">43</b> 位</span>
             </h3>
-            <p class="text-[11px] text-slate-400">撌血?箇???喃????芸?嚗?游?湔?詨??湔迤?梁迂??????/p>
+            <p class="text-[11px] text-slate-400">左側為當時上傳之原始截圖，右側可直接核對更正暱稱與各項戰力數值</p>
           </div>
         </div>
 
-        <!-- 敹恍?銝雿?/ 銝?雿???-->
+        <!-- 快速上一位 / 下一位導航 -->
         <div class="flex items-center space-x-2">
-          <button type="button" onclick="app.verifyPrevMember()" title="敹急?蛛??萇 [ ???? class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
-            <span>?</span> 銝?雿?          </button>
-          <button type="button" onclick="app.verifyNextMember()" title="敹急?蛛??萇 ] ???? class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
-            銝?雿?<span>??/span>
+          <button type="button" onclick="app.verifyPrevMember()" title="快捷鍵：鍵盤 [ 或 ←" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
+            <span>◀</span> 上一位
+          </button>
+          <button type="button" onclick="app.verifyNextMember()" title="快捷鍵：鍵盤 ] 或 →" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1 transition">
+            下一位 <span>▶</span>
           </button>
           <button type="button" onclick="app.closeModal('member-verify-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg ml-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -816,133 +825,135 @@
         </div>
       </div>
 
-      <!-- ???批捆銝駁? -->
+      <!-- 雙欄內容主體 -->
       <div class="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-0">
         
-        <!-- 撌血嚗?憪?? (md:col-span-7) -->
+        <!-- 左側：原始截圖區 (md:col-span-7) -->
         <div class="md:col-span-7 bg-slate-950/80 p-4 border-r border-slate-800 flex flex-col justify-between overflow-hidden">
           <div class="flex items-center justify-between pb-2 border-b border-slate-800/80 text-xs text-slate-400">
             <div class="flex items-center space-x-2 truncate">
-              <span class="text-slate-500">? 靘???嚗?/span>
-              <span id="verify-img-filename" class="text-cyan-300 font-mono truncate max-w-[200px]">?芣?靘?/span>
+              <span class="text-slate-500">📷 來源圖檔：</span>
+              <span id="verify-img-filename" class="text-cyan-300 font-mono truncate max-w-[200px]">未提供</span>
             </div>
             <div class="flex items-center space-x-2 shrink-0">
               <button type="button" onclick="document.getElementById('verify-file-input').click()" class="text-slate-300 hover:text-cyan-300 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] border border-slate-700">
-                ?? ?湔?/銝?芸?
+                📁 更換/上傳截圖
               </button>
               <button type="button" id="verify-zoom-btn" onclick="app.zoomVerifyImage()" class="text-cyan-400 hover:text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-800 text-[11px]">
-                ?? ?曉之瑼Ｚ?
+                🔍 放大檢視
               </button>
             </div>
             <input type="file" id="verify-file-input" accept="image/*" class="hidden" onchange="app.handleVerifyImageFile(this.files)">
           </div>
 
-          <!-- ??摰孵 / ?芰?摰?蝷?-->
+          <!-- 圖片容器 / 未綁定提示 -->
           <div id="verify-img-container" class="flex-1 flex items-center justify-center p-2 overflow-hidden my-2 rounded-xl bg-black/40 border border-slate-800/80 relative group">
-            <img id="verify-img-preview" src="" alt="??芸?" class="max-w-full max-h-[52vh] object-contain rounded cursor-pointer transition hover:scale-[1.01]" onclick="app.zoomVerifyImage()">
+            <img id="verify-img-preview" src="" alt="成員截圖" class="max-w-full max-h-[52vh] object-contain rounded cursor-pointer transition hover:scale-[1.01]" onclick="app.zoomVerifyImage()">
             <div id="verify-img-empty" class="hidden flex flex-col items-center justify-center text-center p-6 space-y-3 cursor-pointer" onclick="document.getElementById('verify-file-input').click()">
               <div class="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-400">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
               <div>
-                <p class="text-xs font-semibold text-slate-300">甇斗??∠???芷??臬?憪??/p>
-                <p class="text-[11px] text-slate-500 mt-1">暺?甇方??詨??????唾甇斗???<kbd class="px-1 bg-slate-800 rounded text-cyan-400">Ctrl+V</kbd> 鞎潔??喳蝬?</p>
+                <p class="text-xs font-semibold text-slate-300">此成員目前尚未關聯原始截圖</p>
+                <p class="text-[11px] text-slate-500 mt-1">點擊此處選取圖片、拖曳至此或按 <kbd class="px-1 bg-slate-800 rounded text-cyan-400">Ctrl+V</kbd> 貼上即可綁定</p>
               </div>
             </div>
           </div>
 
           <div class="text-[11px] text-slate-500 text-center">
-            ? ?內嚗???????刻撟?閫??摨行炎閬??蝙?冽?曌遝頛芣憭扼?          </div>
+            💡 提示：點擊圖片可開啟全螢幕高解析度檢視，或使用滑鼠滾輪放大。
+          </div>
         </div>
 
-        <!-- ?喳嚗?甇???單???? (md:col-span-5) -->
+        <!-- 右側：數據校正與即時指標區 (md:col-span-5) -->
         <div class="md:col-span-5 p-5 flex flex-col justify-between overflow-y-auto space-y-4">
           
           <div class="space-y-3.5">
-            <!-- ?梁迂頛詨 -->
+            <!-- 暱稱輸入 -->
             <div>
               <label class="block text-slate-300 font-semibold text-xs mb-1">
-                ??梁迂 <span class="text-cyan-400 text-[11px] font-normal">(??OCR 颲刻??炊隢?交甇?</span>
+                遊戲暱稱 <span class="text-cyan-400 text-[11px] font-normal">(若 OCR 辨識有誤請直接更正)</span>
               </label>
-              <input type="text" id="verify-input-name" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-sm focus:outline-none focus:border-cyan-400" placeholder="??梁迂">
+              <input type="text" id="verify-input-name" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-sm focus:outline-none focus:border-cyan-400" placeholder="成員暱稱">
             </div>
 
-            <!-- 鈭雁?箇?撅祆扯撓??-->
+            <!-- 五維基礎屬性輸入 -->
             <div class="space-y-2">
               <label class="block text-slate-300 font-semibold text-xs">
-                鈭雁撅祆扳??<span class="text-slate-400 text-[11px] font-normal">(靽格敺??寞????蝞?</span>
+                五維屬性數值 <span class="text-slate-400 text-[11px] font-normal">(修改後下方戰力即時聯動重算)</span>
               </label>
               <div class="grid grid-cols-2 gap-2.5 text-xs">
                 <div>
-                  <span class="text-[11px] text-cyan-300 font-medium block mb-1">????/span>
+                  <span class="text-[11px] text-cyan-300 font-medium block mb-1">領導力</span>
                   <input type="number" id="verify-input-leadership" oninput="app.updateVerifyLiveMetrics()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-right font-mono text-cyan-300 focus:outline-none focus:border-cyan-400">
                 </div>
                 <div>
-                  <span class="text-[11px] text-emerald-300 font-medium block mb-1">銵??(K)</span>
+                  <span class="text-[11px] text-emerald-300 font-medium block mb-1">血量 (K)</span>
                   <input type="number" id="verify-input-hp" oninput="app.updateVerifyLiveMetrics()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-right font-mono text-emerald-300 focus:outline-none focus:border-cyan-400">
                 </div>
                 <div>
-                  <span class="text-[11px] text-rose-300 font-medium block mb-1">?餅? (K)</span>
+                  <span class="text-[11px] text-rose-300 font-medium block mb-1">攻擊 (K)</span>
                   <input type="number" id="verify-input-atk" oninput="app.updateVerifyLiveMetrics()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-right font-mono text-rose-300 focus:outline-none focus:border-cyan-400">
                 </div>
                 <div>
-                  <span class="text-[11px] text-amber-300 font-medium block mb-1">?脩戌 (K)</span>
+                  <span class="text-[11px] text-amber-300 font-medium block mb-1">防禦 (K)</span>
                   <input type="number" id="verify-input-def" oninput="app.updateVerifyLiveMetrics()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-right font-mono text-amber-300 focus:outline-none focus:border-cyan-400">
                 </div>
                 <div class="col-span-2">
-                  <span class="text-[11px] text-purple-300 font-medium block mb-1">餈賣? (K)</span>
+                  <span class="text-[11px] text-purple-300 font-medium block mb-1">追擊 (K)</span>
                   <input type="number" id="verify-input-pursuit" oninput="app.updateVerifyLiveMetrics()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-right font-mono text-purple-300 focus:outline-none focus:border-cyan-400">
                 </div>
               </div>
             </div>
 
-            <!-- ?單???銵??啣????∠? -->
+            <!-- 即時動態衍生戰力指標卡片 -->
             <div class="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
               <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/80 pb-1.5">
-                <span class="font-medium">???單?銵?閮?蝯?</span>
-                <span class="text-xs text-slate-500">靘?撘????</span>
+                <span class="font-medium">⚡ 即時衍生計算結果</span>
+                <span class="text-xs text-slate-500">依當前公式動態連動</span>
               </div>
               <div class="grid grid-cols-2 gap-2 text-center text-xs font-mono">
                 <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                  <span class="text-[10px] text-indigo-300 block">?儭???/span>
+                  <span class="text-[10px] text-indigo-300 block">🛡️ 防</span>
                   <b id="verify-live-def" class="text-indigo-300 text-sm">0</b>
                 </div>
                 <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
-                  <span class="text-[10px] text-orange-300 block">?? ??/span>
+                  <span class="text-[10px] text-orange-300 block">⚔️ 攻</span>
                   <b id="verify-live-atk" class="text-orange-300 text-sm">0</b>
                 </div>
                 <div class="bg-slate-900 p-2 rounded-lg border border-cyan-950 bg-cyan-950/20">
-                  <span class="text-[10px] text-cyan-300 block">?? 蝮賣??/span>
+                  <span class="text-[10px] text-cyan-300 block">📊 總戰力</span>
                   <b id="verify-live-total" class="text-cyan-300 text-base font-bold">0</b>
                 </div>
                 <div class="bg-slate-900 p-2 rounded-lg border border-cyan-950 bg-cyan-950/20">
-                  <span class="text-[10px] text-cyan-400 block">? ??/span>
+                  <span class="text-[10px] text-cyan-400 block">🎯 均</span>
                   <b id="verify-live-avg" class="text-cyan-400 text-base font-extrabold">0.0</b>
                 </div>
               </div>
             </div>
 
-            <!-- ?脩蔑?蔭???-->
+            <!-- 懲罰處置狀態 -->
             <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/50 border border-slate-800 text-xs">
-              <span class="text-slate-400">?桀??????</span>
+              <span class="text-slate-400">目前處分狀態：</span>
               <div id="verify-penalty-container" class="flex items-center gap-1.5">
-                <!-- ??瘜典???? -->
+                <!-- 動態注入處分膠囊 -->
               </div>
             </div>
 
           </div>
 
-          <!-- 摨???? -->
+          <!-- 底部動作按鈕 -->
           <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
             <button type="button" onclick="app.closeModal('member-verify-modal')" class="text-slate-400 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold">
-              ??
+              取消
             </button>
             <div class="flex items-center gap-2">
               <button type="button" onclick="app.saveVerifyMember(false)" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition shadow">
-                ? ?摮?              </button>
+                💾 僅儲存
+              </button>
               <button type="button" onclick="app.saveVerifyMember(true)" class="btn-primary px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-1 shadow-lg">
-                <span>?脣?銝虫?銝雿?/span>
-                <span>??/span>
+                <span>儲存並下一位</span>
+                <span>▶</span>
               </button>
             </div>
           </div>
@@ -954,12 +965,12 @@
     </div>
   </div>
 
-  <!-- ================= 敶? 5嚗???皜憭扳炎閬?================= -->
+  <!-- ================= 彈窗 5：圖片高清放大檢視 ================= -->
   <div id="ocr-lightbox-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4" onclick="app.closeLightbox()">
     <div class="relative max-w-5xl max-h-[92vh] flex flex-col items-center" onclick="event.stopPropagation()">
       <div class="w-full flex justify-between items-center text-slate-300 pb-2 px-1">
-        <span id="ocr-lightbox-title" class="text-sm font-semibold truncate max-w-md text-cyan-400">???芸?瑼Ｚ?</span>
-        <button onclick="app.closeLightbox()" class="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1 font-bold">???? (ESC)</button>
+        <span id="ocr-lightbox-title" class="text-sm font-semibold truncate max-w-md text-cyan-400">原始截圖檢視</span>
+        <button onclick="app.closeLightbox()" class="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1 font-bold">✕ 關閉 (ESC)</button>
       </div>
       <div class="overflow-auto max-h-[82vh] rounded-lg border border-slate-700 bg-black/50 p-1 flex items-center justify-center">
         <img id="ocr-lightbox-image" src="" alt="Zoomed Preview" class="max-w-full max-h-[80vh] rounded shadow-2xl object-contain">
@@ -967,74 +978,73 @@
     </div>
   </div>
 
-  <!-- ================= 敶? 6嚗翰?閮?蝺刻摩??敶? ================= -->
+  <!-- ================= 彈窗 6：快速登記/編輯處分彈窗 ================= -->
   <div id="penalty-modal" class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
       <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
         <h3 class="font-bold text-white text-base flex items-center gap-2">
-          <span class="text-rose-400">??</span>
-          <span>??脩蔑蝝?身摰?/span>
+          <span class="text-rose-400">⚖️</span>
+          <span>成員懲罰紀錄設定</span>
         </h3>
-        <button onclick="app.closeModal('penalty-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">??/button>
+        <button onclick="app.closeModal('penalty-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
       </div>
       <div class="p-5 space-y-4 text-xs">
         <div>
-          <label class="block text-slate-300 font-medium mb-1">???梁迂</label>
+          <label class="block text-slate-300 font-medium mb-1">成員遊戲暱稱</label>
           <input type="text" id="modal-penalty-name" readonly class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-sm focus:outline-none cursor-not-allowed text-cyan-300">
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-slate-300 font-medium mb-1">???批捆 / ?</label>
+            <label class="block text-slate-300 font-medium mb-1">處分內容 / 項目</label>
             <select id="modal-penalty-action" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-400 font-medium">
-              <option value="霅血?1甈?>霅血?1甈?/option>
-              <option value="霅血?2甈?>霅血?2甈?/option>
-              <option value="???Ｘ香????>???Ｘ香????/option>
+              <option value="警告1次">警告1次</option>
+              <option value="警告2次">警告2次</option>
+              <option value="取消敢死隊資格">取消敢死隊資格</option>
             </select>
           </div>
           <div>
-            <label class="block text-slate-300 font-medium mb-1">?瑁????/label>
+            <label class="block text-slate-300 font-medium mb-1">執行狀態</label>
             <select id="modal-penalty-status" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-400 font-medium">
-              <option value="?芸銵?>?芸銵?/option>
-              <option value="?瑁?銝?>?瑁?銝?/option>
-              <option value="撌脤??鋆?">撌脤??鋆?</option>
+              <option value="未執行">未執行</option>
+              <option value="執行中">執行中</option>
+              <option value="已銷假/補救">已銷假/補救</option>
             </select>
           </div>
         </div>
         <div>
-          <label class="block text-slate-300 font-medium mb-1">?脩蔑??璅惜 (?舫??詨??????</label>
+          <label class="block text-slate-300 font-medium mb-1">懲罰原因標籤 (可點選多個同時勾選)</label>
           <div class="flex gap-1.5 mb-2 flex-wrap" id="modal-penalty-tags">
-            <button type="button" data-tag="?芣??誘" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?芣??誘')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?芣??誘</button>
-            <button type="button" data-tag="?芣??隞? onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?芣??隞?)" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?芣??隞?/button>
-            <button type="button" data-tag="?芣??望" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?芣??望')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?芣??望</button>
-            <button type="button" data-tag="?芷?蝵桀蝔? onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?芷?蝵桀蝔?)" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?芷?蝵桀蝔?/button>
-            <button type="button" data-tag="頝冽??啣仃?? onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '頝冽??啣仃??)" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">頝冽??啣仃??/button>
-            <button type="button" data-tag="?啣??芷?璅? onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?啣??芷?璅?)" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?啣??芷?璅?/button>
-            <button type="button" data-tag="?芷???隞? onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '?芷???隞?)" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">?芷???隞?/button>
+            <button type="button" data-tag="未打金令" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '未打金令')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">未打金令</button>
+            <button type="button" data-tag="未打銀令" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '未打銀令')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">未打銀令</button>
+            <button type="button" data-tag="未打週戰" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '未打週戰')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">未打週戰</button>
+            <button type="button" data-tag="未配置兵種" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '未配置兵種')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">未配置兵種</button>
+            <button type="button" data-tag="跨服戰失聯" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '跨服戰失聯')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">跨服戰失聯</button>
+            <button type="button" data-tag="戰力未達標" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '戰力未達標')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">戰力未達標</button>
+            <button type="button" data-tag="未配合指令" onclick="app.togglePenaltyTag('modal-penalty-reason', 'modal-penalty-tags', '未配合指令')" class="reason-tag px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition">未配合指令</button>
           </div>
-          <input type="text" id="modal-penalty-reason" placeholder="憛怠神???訾??孵????航???..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-400">
+          <input type="text" id="modal-penalty-reason" placeholder="填寫或點選上方原因(可複選)..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-400">
         </div>
         <div>
-          <label class="block text-slate-300 font-medium mb-1">?餉??交?</label>
+          <label class="block text-slate-300 font-medium mb-1">登記日期</label>
           <input type="date" id="modal-penalty-date" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
         </div>
       </div>
       <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between">
-        <button id="modal-penalty-delete-btn" onclick="app.deletePenaltyForCurrentModal()" class="text-rose-400 hover:text-rose-300 text-xs px-3 py-1.5 rounded hover:bg-rose-950/30 transition hidden">閫???</button>
+        <button id="modal-penalty-delete-btn" onclick="app.deletePenaltyForCurrentModal()" class="text-rose-400 hover:text-rose-300 text-xs px-3 py-1.5 rounded hover:bg-rose-950/30 transition hidden">解除處分</button>
         <div class="flex items-center gap-2 ml-auto">
-          <button onclick="app.closeModal('penalty-modal')" class="text-slate-400 hover:text-white px-3 py-1.5 rounded text-xs">??</button>
-          <button onclick="app.savePenaltyFromModal()" class="btn-primary px-5 py-2 rounded-lg font-bold text-xs">蝣箄??脣???</button>
+          <button onclick="app.closeModal('penalty-modal')" class="text-slate-400 hover:text-white px-3 py-1.5 rounded text-xs">取消</button>
+          <button onclick="app.savePenaltyFromModal()" class="btn-primary px-5 py-2 rounded-lg font-bold text-xs">確認儲存處分</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Toast 頛?? -->
+  <!-- Toast 輕量通知 -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-900 border border-cyan-500/50 text-cyan-300 px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium transition-all duration-300 transform opacity-0 translate-y-4 pointer-events-none flex items-center gap-2">
   </div>
 
-  <!-- 頛?詨?璅∠? -->
+  <!-- 載入核心模組 -->
   <script src="ocr.js?v=20260922_11"></script>
   <script src="app.js?v=20260922_11"></script>
 </body>
 </html>
-

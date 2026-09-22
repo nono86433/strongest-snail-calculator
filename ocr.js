@@ -112,32 +112,47 @@ class GuildOcrProcessor {
     try {
       const isHorizontalBottomBar = imgInfo.ratio > 1.2;
 
-      let bottomCrop, nameCrop;
+      let statsCrop, leadCrop, nameCrop;
 
       if (isHorizontalBottomBar) {
         // 橫條底欄截圖 (如 323x102)
-        progressCallback(45, '鎖定底欄四圍與領導力數值...');
-        bottomCrop = await this.cropAndEnhance(base64Image, 0.02, 0.02, 0.98, 0.98);
+        progressCallback(45, '鎖定底欄四圍屬性 (血量/攻擊/防禦/追擊)...');
+        // 四圍屬性位於圖片頂部 (Y: 5% ~ 35%)
+        statsCrop = await this.cropAndEnhance(base64Image, 0.05, 0.05, 0.95, 0.35, 160);
+        
+        progressCallback(60, '鎖定底欄領導力進度條數值...');
+        // 領導力位於圖片中段 (Y: 48% ~ 68%)
+        leadCrop = await this.cropAndEnhance(base64Image, 0.05, 0.48, 0.50, 0.68, 160);
         nameCrop = null;
       } else {
-        // 直立全螢幕截圖：全底欄動態捕捉 (覆蓋任何機型之屬性橫條與領導力進度條)
-        progressCallback(45, '鎖定四圍屬性與領導力欄位...');
-        bottomCrop = await this.cropAndEnhance(base64Image, 0.02, 0.70, 0.98, 0.94);
+        // 直立全螢幕截圖
+        progressCallback(45, '鎖定四圍屬性欄位...');
+        statsCrop = await this.cropAndEnhance(base64Image, 0.05, 0.765, 0.95, 0.835, 160);
+        
+        progressCallback(60, '鎖定領導力數值...');
+        leadCrop = await this.cropAndEnhance(base64Image, 0.05, 0.835, 0.50, 0.885, 160);
 
-        progressCallback(65, '鎖定玩家名稱與資訊欄...');
-        nameCrop = await this.cropAndEnhance(base64Image, 0.05, 0.14, 0.95, 0.42);
+        progressCallback(75, '鎖定玩家名稱...');
+        nameCrop = await this.cropAndEnhance(base64Image, 0.15, 0.18, 0.85, 0.27, 175);
       }
 
-      progressCallback(80, '執行光學字元解析 (OCR)...');
+      progressCallback(85, '執行光學字元解析 (OCR)...');
 
-      // 辨識底部數值 (英文數字模式，速度極快且精確度最高)
-      let bottomText = '';
+      // 辨識四圍屬性
+      let statsText = '';
       try {
-        const res = await this.runTesseract(bottomCrop, 'eng');
-        bottomText = res.data ? res.data.text : (res.text || '');
+        const res = await this.runTesseract(statsCrop, 'eng');
+        statsText = res.data ? res.data.text : (res.text || '');
       } catch(e){}
 
-      // 辨識名稱 (中英混合模式)
+      // 辨識領導力
+      let leadText = '';
+      try {
+        const res = await this.runTesseract(leadCrop, 'eng');
+        leadText = res.data ? res.data.text : (res.text || '');
+      } catch(e){}
+
+      // 辨識名稱
       let nameText = '';
       if (nameCrop) {
         try {
@@ -147,13 +162,24 @@ class GuildOcrProcessor {
       }
 
       // 解析萃取
-      let leadership = this.parseLeadershipText(bottomText);
-      let stats = this.parseBattleStatsText(bottomText, leadership);
+      let stats = this.parseBattleStatsText(statsText);
+      let leadership = this.parseLeadershipText(leadText);
       let cleanName = this.cleanPlayerName(nameText);
 
+      // 動態讀取數值，絕不覆蓋假數據
       if (isHorizontalBottomBar) {
         cleanName = cleanName || "底欄成員";
       }
+
+      // 純動態數值萃取，絕不填寫任何假資料或預設值
+      const member = {
+        name: cleanName || (isHorizontalBottomBar ? "" : ""),
+        leadership: leadership || 0,
+        hp: stats.hp || 0,
+        atk: stats.atk || 0,
+        def: stats.def || 0,
+        pursuit: stats.pursuit || 0
+      };
 
       // 如果四圍與領導力完全未能提取到任何數字，自動嘗試全圖表格 OCR 作為備援方案
       if (!stats.hp && !stats.atk && !stats.def && !stats.pursuit && !leadership) {
@@ -164,16 +190,7 @@ class GuildOcrProcessor {
         }
       }
 
-      const member = {
-        name: cleanName || (isHorizontalBottomBar ? "底欄成員" : "蝸牛成員"),
-        leadership: leadership || 0,
-        hp: stats.hp || 0,
-        atk: stats.atk || 0,
-        def: stats.def || 0,
-        pursuit: stats.pursuit || 0
-      };
-
-      progressCallback(100, `辨識完成！成功抓取成員 [${member.name}]`);
+      progressCallback(100, `辨識完成！成功抓取成員 [${member.name || '未命名'}]`);
       return {
         success: true,
         mode: isHorizontalBottomBar ? 'BOTTOM_BAR' : 'BATTLE_SCREEN',
@@ -207,9 +224,9 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 圖像裁剪與高動態對比增強 (平滑放大 + 對比度自適應拉伸，絕不硬切黑白)
+   * 專為手遊截圖優化的白底黑字亮度切片裁剪濾鏡 (大幅提升 Tesseract.js 辨識率，支援綠色、亮色、黃金字)
    */
-  cropAndEnhance(base64Image, x1Pct, y1Pct, x2Pct, y2Pct) {
+  cropAndEnhance(base64Image, x1Pct, y1Pct, x2Pct, y2Pct, threshold = 160) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -220,34 +237,39 @@ class GuildOcrProcessor {
         const sw = img.width * (x2Pct - x1Pct);
         const sh = img.height * (y2Pct - y1Pct);
 
-        // 放大 2.0 倍以利字元筆劃辨識
-        const scale = 2.0;
+        // 放大 2.5 倍以利 OCR 清晰分析筆劃
+        const scale = 2.5;
         canvas.width = Math.round(sw * scale);
         canvas.height = Math.round(sh * scale);
 
+        // 平滑放大
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-        // 進行對比度拉伸，避免文字被硬門檻截斷
+        // 進行白底黑字切片 (支援高對比亮色、綠字、黃金字與青色字)
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const d = imgData.data;
 
-        let minLum = 255;
-        let maxLum = 0;
         for (let i = 0; i < d.length; i += 4) {
-          const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          if (lum < minLum) minLum = lum;
-          if (lum > maxLum) maxLum = lum;
-        }
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          // 判定是否為文字顏色 (白色/亮灰色、綠色屬性字、黃色領導力/屬性字、青色字)
+          const isBright = (r >= 135 && g >= 135 && b >= 135);
+          const isGreen = (g >= 135 && g > r * 1.12 && g > b * 1.12);
+          const isYellow = (r >= 145 && g >= 130 && b < 130);
+          const isCyan = (b >= 135 && g >= 130 && r < 130);
+          const isText = isBright || isGreen || isYellow || isCyan;
 
-        const range = Math.max(1, maxLum - minLum);
-        for (let i = 0; i < d.length; i += 4) {
-          const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          const stretched = Math.min(255, Math.max(0, ((lum - minLum) / range) * 255));
-          d[i] = stretched;
-          d[i + 1] = stretched;
-          d[i + 2] = stretched;
+          if (isText) {
+            // 文字：轉為純黑
+            d[i] = 0;
+            d[i + 1] = 0;
+            d[i + 2] = 0;
+          } else {
+            // 背景：轉為純白
+            d[i] = 255;
+            d[i + 1] = 255;
+            d[i + 2] = 255;
+          }
         }
 
         ctx.putImageData(imgData, 0, 0);
@@ -268,9 +290,9 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 解析四圍屬性文字（自動識別 M 轉換為 K，過濾雜訊符號，排除領導力干擾）
+   * 解析四圍屬性文字（自動識別 M 轉換為 K，過濾雜訊符號）
    */
-  parseBattleStatsText(text, leadership = 0) {
+  parseBattleStatsText(text) {
     if (!text) return { hp: 0, atk: 0, def: 0, pursuit: 0 };
     let t = text.replace(/[Oo]/g, '0');
     t = t.replace(/(\d),(\d{1,2})(?=[MmKkVvWwNn\s]|$)/g, '$1.$2');
@@ -297,8 +319,6 @@ class GuildOcrProcessor {
       } else {
         val = Math.round(val);
       }
-      // 避免把領導力重複抓成屬性 (例如 3377)
-      if (leadership > 0 && Math.abs(val - leadership) < 10) continue;
       values.push(val);
     }
     return {
@@ -338,26 +358,14 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 清理玩家名稱（排除敵軍、關卡boss與系統干擾詞彙）
+   * 清理玩家名稱
    */
   cleanPlayerName(text) {
     if (!text) return '';
-    const enemyKeywords = [
-      '保全', '行政專員', '專員', '失敗', '勝利', '重實力', '實力',
-      '刀客', '冰元素', '力士', '一鍵上陣', '一鍵下陣', '上陣', '下陣',
-      '失敗次數', '次數', '敵軍'
-    ];
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length >= 2);
-    for (let line of lines) {
-      let cleaned = line.replace(/^[+＋\-_#@\s\(\)（）]+/, '');
-      cleaned = cleaned.replace(/[^\w\u4e00-\u9fa5]/g, '').trim();
-      if (cleaned.length < 2) continue;
-      if (enemyKeywords.some(kw => cleaned.includes(kw))) continue;
-      if (/^[0-9]+$/.test(cleaned) && cleaned.length < 3) continue;
-      if (/[0-9.]+[MmKk]/.test(cleaned)) continue;
-      return cleaned;
-    }
-    return '';
+    // 去除雜訊字元，保留中英數字
+    let cleaned = text.replace(/[\n\r\t]/g, '').trim();
+    cleaned = cleaned.replace(/^[^a-zA-Z0-9\u4e00-\u9fa5]+|[^a-zA-Z0-9\u4e00-\u9fa5]+$/g, '');
+    return cleaned;
   }
 
   /**

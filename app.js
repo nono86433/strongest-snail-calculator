@@ -504,13 +504,13 @@ class GuildApp {
 
     progressBar.style.width = '100%';
     if (this.pendingOcrResults.length > 0) {
-      // 偵測：若使用 Tesseract 且數值明顯異常（hp < 5000 或全為 0），主動提示設定 Gemini
+      // 偵測：若使用 Tesseract 且數值明顯異常，主動提示設定 Gemini
       const hasAbnormalTesseract = this.pendingOcrResults.some(m =>
         m._ocrMode === 'FRONTEND_OCR' && (!m.hp || m.hp < 5000 || !m.name)
       );
       const noGeminiKey = !localStorage.getItem('guild_gemini_key');
       if (hasAbnormalTesseract && noGeminiKey && window.location.hostname.includes('github.io')) {
-        this._pendingGeminiPrompt = true; // 標記稍後在校對步驟顯示警告
+        this._pendingGeminiPrompt = true;
       }
       this.showOcrVerificationStep(false);
     } else {

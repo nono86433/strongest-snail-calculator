@@ -335,6 +335,45 @@ class GuildApp {
   }
 
   /**
+   * 刪除當前週次
+   */
+  deleteCurrentWeek() {
+    const weekKeys = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
+    const targetWeek = this.currentWeek;
+
+    if (weekKeys.length <= 1) {
+      if (confirm(`目前僅剩第 ${targetWeek} 週。確定要清空此週次的所有成員數據並重設嗎？`)) {
+        this.weeksData[targetWeek] = [];
+        this.members = [];
+        this.saveToStorage();
+        this.render();
+        this.showToast(`已清空並重設第 ${targetWeek} 週！`);
+      }
+      return;
+    }
+
+    const memberCount = (this.weeksData[targetWeek] || []).length;
+    const msg = `確定要刪除【第 ${targetWeek} 週】嗎？\n該週包含 ${memberCount} 位成員數據，刪除後將無法復原！`;
+    if (!confirm(msg)) return;
+
+    delete this.weeksData[targetWeek];
+
+    // 切換至剩餘的最接近週次
+    const remainingWeeks = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
+    // 優先找比當前週小的前一週，若無則取第一週
+    let nextWeek = remainingWeeks.filter(w => w < targetWeek).pop();
+    if (!nextWeek) {
+      nextWeek = remainingWeeks[0];
+    }
+
+    this.currentWeek = nextWeek;
+    this.members = this.weeksData[nextWeek] || [];
+    this.saveToStorage();
+    this.render();
+    this.showToast(`已成功刪除第 ${targetWeek} 週！已切換至第 ${nextWeek} 週。`);
+  }
+
+  /**
    * 表格排序
    */
   handleSort(column) {

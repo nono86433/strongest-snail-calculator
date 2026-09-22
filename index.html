@@ -13,7 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <!-- 客製樣式 -->
-  <link rel="stylesheet" href="styles.css?v=20260922_9">
+  <link rel="stylesheet" href="styles.css?v=20260922_10">
   <script>
     tailwind.config = {
       theme: {
@@ -585,8 +585,18 @@
             <p class="font-medium text-white text-sm">點擊選取截圖檔案（可一次選取多張），或拖曳圖片至此</p>
             <p class="text-xs text-slate-400">亦可在此直接按 <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-300">Ctrl + V</kbd> 貼上截圖</p>
             <div class="pt-2 text-xs text-slate-500">
-              💡 支援全螢幕兵種截圖、局部底欄截圖或公會表格截圖，系統自動離線動態辨識
+              💡 支援全螢幕兵種截圖、局部底欄截圖或公會表格截圖，系統自動動態辨識
             </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span class="flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>辨識引擎：<span id="ocr-engine-label" class="text-slate-300">自動適配 (本機 RapidOCR / 前端 Tesseract)</span></span>
+            </span>
+            <button type="button" onclick="event.stopPropagation(); app.promptGeminiApiKey()" class="text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+              設定 Gemini AI 雲端金鑰 (免本機伺服器)
+            </button>
           </div>
         </div>
 
@@ -1017,7 +1027,7 @@
   </div>
 
   <!-- 載入核心模組 -->
-  <script src="ocr.js?v=20260922_9"></script>
-  <script src="app.js?v=20260922_9"></script>
+  <script src="ocr.js?v=20260922_10"></script>
+  <script src="app.js?v=20260922_10"></script>
 </body>
 </html>

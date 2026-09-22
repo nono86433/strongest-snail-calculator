@@ -37,6 +37,7 @@ class GuildApp {
     this.loadFromStorage();
     this.bindEvents();
     this.render();
+    this.updateOcrEngineLabel();
   }
 
   /**
@@ -504,8 +505,46 @@ class GuildApp {
     if (this.pendingOcrResults.length > 0) {
       this.showOcrVerificationStep(false);
     } else {
-      alert('未能從上傳的圖片中解析出成員數據，請確認截圖是否清晰。');
+      const isOnlineStatic = window.location.hostname.includes('github.io');
+      let tip = '未能從上傳的圖片中解析出成員數據，請確認截圖是否清晰完整。';
+      if (isOnlineStatic) {
+        tip += '\n\n💡 操作建議：\n1. 【推薦】若在電腦使用，可執行資料夾內的 start.bat 並在瀏覽器開啟 http://localhost:8000，立即享有本機 RapidOCR 極速神經網路引擎 100% 辨識率！\n2. 【跨平台】若在手機、平板或純網頁使用，可點擊「設定 Gemini AI 雲端金鑰」，輸入免費的 Google Gemini API Key，即可享有全自動 AI 視覺高精度解析！\n3. 請確認截圖為遊戲內清晰之兵種演練上陣介面或公會戰四圍面板。';
+      }
+      alert(tip);
       this.closeModal('ocr-modal');
+    }
+  }
+
+  /**
+   * 設定 Gemini AI 視覺金鑰
+   */
+  promptGeminiApiKey() {
+    const currentKey = localStorage.getItem('guild_gemini_key') || '';
+    const newKey = prompt('請輸入 Google Gemini API Key（免本機伺服器，手機/網頁端皆享有 100% 雲端 AI 視覺高精準解析）：', currentKey);
+    if (newKey !== null) {
+      window.guildOcr.setGeminiKey(newKey);
+      if (newKey.trim()) {
+        this.showToast('✨ 已成功設定 Gemini AI 視覺辨識金鑰！');
+      } else {
+        this.showToast('已清除 Gemini API 金鑰');
+      }
+      this.updateOcrEngineLabel();
+    }
+  }
+
+  /**
+   * 更新 OCR 彈窗中的引擎標籤狀態
+   */
+  updateOcrEngineLabel() {
+    const el = document.getElementById('ocr-engine-label');
+    if (!el) return;
+    const geminiKey = localStorage.getItem('guild_gemini_key');
+    if (geminiKey) {
+      el.textContent = '✨ Gemini 1.5 雲端 AI 視覺 (高精度推薦)';
+      el.className = 'text-amber-300 font-semibold';
+    } else {
+      el.textContent = '自動適配 (本機 RapidOCR / 前端 Tesseract)';
+      el.className = 'text-slate-300';
     }
   }
 

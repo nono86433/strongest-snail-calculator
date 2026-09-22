@@ -74,12 +74,12 @@ class GuildOcrProcessor {
       progressCallback(35, '本機伺服器未連線，啟動純前端辨識中...');
       try {
         const frontendRes = await this.recognizeBattleScreenFrontend(base64Image, imgInfo, progressCallback);
-        if (frontendRes && frontendRes.length > 0) {
-          progressCallback(100, `前端辨識完成！提取到 ${frontendRes.length} 筆資料`);
+        if (frontendRes && frontendRes.members && frontendRes.members.length > 0) {
+          progressCallback(100, `前端辨識完成！提取到 ${frontendRes.members.length} 筆資料`);
           return {
             success: true,
             mode: 'FRONTEND_OCR',
-            members: frontendRes,
+            members: frontendRes.members,
             imageUrl: base64Image,
             fileName: fileName || '上傳截圖'
           };
@@ -181,7 +181,16 @@ class GuildOcrProcessor {
         pursuit: stats.pursuit || 0
       };
 
-      progressCallback(100, `辨識完成！成功抓取成員 [${member.name}]`);
+      // 如果四圍與領導力完全未能提取到任何數字，自動嘗試全圖表格 OCR 作為備援方案
+      if (!stats.hp && !stats.atk && !stats.def && !stats.pursuit && !leadership) {
+        progressCallback(90, '嘗試全畫面文字檢測...');
+        const tableRes = await this.recognizeTableFrontend(base64Image, progressCallback);
+        if (tableRes && tableRes.members && tableRes.members.length > 0) {
+          return tableRes;
+        }
+      }
+
+      progressCallback(100, `辨識完成！成功抓取成員 [${member.name || '未命名'}]`);
       return {
         success: true,
         mode: isHorizontalBottomBar ? 'BOTTOM_BAR' : 'BATTLE_SCREEN',
@@ -215,9 +224,9 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 專為手遊截圖優化的白底黑字亮度切片裁剪濾鏡 (大幅提升 Tesseract.js 辨識率)
+   * 專為手遊截圖優化的白底黑字亮度切片裁剪濾鏡 (大幅提升 Tesseract.js 辨識率，支援綠色、亮色、黃金字)
    */
-  cropAndEnhance(base64Image, x1Pct, y1Pct, x2Pct, y2Pct, threshold = 175) {
+  cropAndEnhance(base64Image, x1Pct, y1Pct, x2Pct, y2Pct, threshold = 160) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -237,17 +246,20 @@ class GuildOcrProcessor {
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-        // 進行白底黑字切片 (將亮色字體轉為純黑，背景雜訊轉為純白)
+        // 進行白底黑字切片 (支援高對比亮色、綠字、黃金字與青色字)
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const d = imgData.data;
 
         for (let i = 0; i < d.length; i += 4) {
           const r = d[i], g = d[i + 1], b = d[i + 2];
-          // 判定是否為亮色/白色字體
-          const isBrightText = (r >= threshold && g >= threshold && b >= threshold) ||
-                               (r > 190 && g > 190 && Math.abs(r - g) < 30);
+          // 判定是否為文字顏色 (白色/亮灰色、綠色屬性字、黃色領導力/屬性字、青色字)
+          const isBright = (r >= 135 && g >= 135 && b >= 135);
+          const isGreen = (g >= 135 && g > r * 1.12 && g > b * 1.12);
+          const isYellow = (r >= 145 && g >= 130 && b < 130);
+          const isCyan = (b >= 135 && g >= 130 && r < 130);
+          const isText = isBright || isGreen || isYellow || isCyan;
 
-          if (isBrightText) {
+          if (isText) {
             // 文字：轉為純黑
             d[i] = 0;
             d[i + 1] = 0;
@@ -278,20 +290,34 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 解析四圍屬性文字（自動識別 M 轉換為 K）
+   * 解析四圍屬性文字（自動識別 M 轉換為 K，過濾雜訊符號）
    */
   parseBattleStatsText(text) {
-    // 比對例如 107M, 82.4M, 20.6M, 19.2M, 21.3M 等
-    const matches = [...text.matchAll(/(\d+(?:\.\d+)?)\s*([MKmk])?/g)];
+    if (!text) return { hp: 0, atk: 0, def: 0, pursuit: 0 };
+    let t = text.replace(/[Oo]/g, '0');
+    t = t.replace(/(\d),(\d{1,2})(?=[MmKkVvWwNn\s]|$)/g, '$1.$2');
+    t = t.replace(/(\d)\s+(\d\s*[MmKkVvWwNn])/g, '$1.$2');
+    t = t.replace(/(\.\d)1{1,2}$/g, '$1M');
+
+    // 匹配如 107M, 20.6M, 19.2M 等
+    const matches = [...t.matchAll(/(\d+(?:\.\d+)?)\s*([MmKkVvWwNn])?/g)];
     const values = [];
     for (let m of matches) {
-      let val = parseFloat(m[1]);
+      let numStr = m[1];
+      const iconMatch = numStr.match(/^[83S569BbEe](\d{2}(?:\.\d+)?)$/);
+      if (iconMatch) {
+        const cand = parseFloat(iconMatch[1]);
+        if (cand >= 10.0 && cand <= 99.9) {
+          numStr = iconMatch[1];
+        }
+      }
+      let val = parseFloat(numStr);
+      if (isNaN(val) || val <= 0) continue;
       const unit = (m[2] || '').toUpperCase();
-      if (unit === 'M') {
-        val = Math.round(val * 1000); // 107M -> 107000, 20.6M -> 20600
-      } else if (val < 1000 && (unit === '' || !unit)) {
-        // 若辨識漏掉 M 但數字只有十幾、幾十（如 107、20.6），在最強蝸牛屬性中必然是 M 單位！
+      if (['M', 'V', 'W', 'N', '1'].includes(unit) || val < 1000) {
         val = Math.round(val * 1000);
+      } else {
+        val = Math.round(val);
       }
       values.push(val);
     }
@@ -304,14 +330,27 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 解析領導力文字 (例如 3751/3751, 3402/3402)
+   * 解析領導力文字 (支援 3751/3751, 340273402, 3402 等格式)
    */
   parseLeadershipText(text) {
-    const m = text.match(/(\d{3,5})\s*[\/\\]\s*(\d{3,5})/);
-    if (m) {
+    if (!text) return 0;
+    let t = text.replace(/[Oo]/g, '0');
+    // 標準斜線分隔: 3402/3402
+    const m = t.match(/(\d{3,5})\s*[\/\\|!:_]\s*(\d{3,5})/);
+    if (m && (m[1] === m[2] || (parseInt(m[1]) >= 2000 && parseInt(m[1]) <= 7500))) {
       return parseInt(m[1], 10);
     }
-    const single = text.match(/\b([2-5]\d{3})\b/);
+    // 8位或9位連寫 (如 34023402, 340273402)
+    const digits = t.replace(/\D/g, '');
+    if (digits.length === 8 && digits.slice(0, 4) === digits.slice(4)) {
+      const val = parseInt(digits.slice(0, 4), 10);
+      if (val >= 2000 && val <= 7500) return val;
+    }
+    if (digits.length === 9 && digits.slice(0, 4) === digits.slice(5)) {
+      const val = parseInt(digits.slice(0, 4), 10);
+      if (val >= 2000 && val <= 7500) return val;
+    }
+    const single = t.match(/\b([2-6]\d{3})\b/);
     if (single) {
       return parseInt(single[1], 10);
     }

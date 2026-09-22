@@ -492,6 +492,7 @@ class GuildApp {
             calculated.imageUrl = res.imageUrl || ''; // 伺服器持久化路徑 (/uploads/...)
             calculated.sourceImage = base64; // 暫存 Base64 供當前視窗即時檢視
             calculated.fileName = res.fileName || file.name;
+            calculated._ocrMode = res.mode || 'UNKNOWN'; // 記錄辨識引擎
             this.pendingOcrResults.push(calculated);
             successCount++;
           }
@@ -503,6 +504,14 @@ class GuildApp {
 
     progressBar.style.width = '100%';
     if (this.pendingOcrResults.length > 0) {
+      // 偵測：若使用 Tesseract 且數值明顯異常（hp < 5000 或全為 0），主動提示設定 Gemini
+      const hasAbnormalTesseract = this.pendingOcrResults.some(m =>
+        m._ocrMode === 'FRONTEND_OCR' && (!m.hp || m.hp < 5000 || !m.name)
+      );
+      const noGeminiKey = !localStorage.getItem('guild_gemini_key');
+      if (hasAbnormalTesseract && noGeminiKey && window.location.hostname.includes('github.io')) {
+        this._pendingGeminiPrompt = true; // 標記稍後在校對步驟顯示警告
+      }
       this.showOcrVerificationStep(false);
     } else {
       const isOnlineStatic = window.location.hostname.includes('github.io');
@@ -679,6 +688,17 @@ class GuildApp {
     const stepResult = document.getElementById('ocr-step-result');
     stepLoading.classList.add('hidden');
     stepResult.classList.remove('hidden');
+
+    // 若偵測到 Tesseract 辨識異常，顯示 Gemini Key 設定警告橫幅
+    const warningEl = document.getElementById('ocr-tesseract-warning');
+    if (warningEl) {
+      if (this._pendingGeminiPrompt) {
+        warningEl.classList.remove('hidden');
+        this._pendingGeminiPrompt = false;
+      } else {
+        warningEl.classList.add('hidden');
+      }
+    }
 
     // 渲染校對總數
     const countBadge = document.getElementById('ocr-detected-count');

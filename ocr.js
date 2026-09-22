@@ -146,17 +146,21 @@ class GuildOcrProcessor {
 
       progressCallback(85, '執行光學字元解析 (OCR)...');
 
-      // 辨識四圍屬性
+      // 辨識四圍屬性 (強制白名單：僅允許數字、小數點與單位 M/K，排除雜訊)
       let statsText = '';
       try {
-        const res = await this.runTesseract(statsCrop, 'eng');
+        const res = await this.runTesseract(statsCrop, 'eng', {
+          tessedit_char_whitelist: '0123456789.MKmk '
+        });
         statsText = res.data ? res.data.text : (res.text || '');
       } catch(e){}
 
-      // 辨識領導力
+      // 辨識領導力 (強制白名單：僅允許數字與斜線)
       let leadText = '';
       try {
-        const res = await this.runTesseract(leadCrop, 'eng');
+        const res = await this.runTesseract(leadCrop, 'eng', {
+          tessedit_char_whitelist: '0123456789/ '
+        });
         leadText = res.data ? res.data.text : (res.text || '');
       } catch(e){}
 
@@ -290,11 +294,11 @@ class GuildOcrProcessor {
   /**
    * 調用 Tesseract
    */
-  async runTesseract(imageSource, lang = 'eng') {
+  async runTesseract(imageSource, lang = 'eng', options = {}) {
     if (typeof Tesseract === 'undefined') {
       throw new Error('Tesseract.js 尚未載入');
     }
-    return await Tesseract.recognize(imageSource, lang);
+    return await Tesseract.recognize(imageSource, lang, options);
   }
 
   /**

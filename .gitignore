@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Intermediate OCR test crops & debug images
+crop_*.png
+scale_*.png
+test_*.png
+gray_*.png
+bb_*.png
+seg_*.png
+col_*.png
+binary_*.png
+char_di*.png
+clean_green.png
+stats_strip_padded.png
+strip_enhanced.png
+stat_crop.png
+green_diff_*.png
+name_crop.png
+name_adapt.png
+name_otsu*.png
+hp_box.png
+right_stats*.png
+bottom_section*.png
+bot_snail.png
+top_snail.png
+full_gray.png
+full_user_game*.png
+game_only.png
+pursuit_zone.png
+user_latest_crop.png
+user_snail_screen.png
+user_uploaded_test*.png
+upper_preview.png
+battle_*.png
+europa_2x.png
+europa_extracted.png
+europa_panel.png
+
+# Scratch test files
+scratch/
+test_pixel_ocr.py
+test_ocr.ps1
+win_ocr.ps1
+
+# OS files
+Thumbs.db
+.DS_Store

@@ -1,0 +1,158 @@
+/* 最強蝸牛公會數據管理系統 - 樣式表 */
+:root {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #26354a;
+  --border-color: #334155;
+  --accent-color: #38bdf8;
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  --gold-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", "微軟正黑體", sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* 自訂捲軸 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 表格專屬樣式 (精簡版面，確保13欄直接完整呈現無水平捲軸遮擋) */
+.guild-table th {
+  background-color: #1e293b;
+  color: #cbd5e1;
+  font-weight: 600;
+  text-align: right;
+  padding: 6px 4px;
+  font-size: 0.78rem;
+  border-bottom: 2px solid #334155;
+  white-space: nowrap;
+  user-select: none;
+}
+.guild-table th.text-left {
+  text-align: left;
+}
+.guild-table th.sortable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.guild-table th.sortable:hover {
+  background-color: #2e3e56;
+  color: #38bdf8;
+}
+
+.guild-table td {
+  padding: 4px 4px;
+  border-bottom: 1px solid #1e293b;
+  font-size: 0.8rem;
+  text-align: right;
+  white-space: nowrap;
+}
+.guild-table td.text-left {
+  text-align: left;
+}
+
+.guild-table tr:hover {
+  background-color: rgba(56, 189, 248, 0.05);
+}
+
+/* 隱藏表格數字輸入框的上下調節箭頭，節省寶貴水平空間 */
+.guild-table input[type="number"]::-webkit-inner-spin-button,
+.guild-table input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.guild-table input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* 計算欄位標籤 */
+.badge-calc {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background-color: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+/* 漸層按鈕 */
+.btn-primary {
+  background: var(--accent-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px 0 rgba(56, 189, 248, 0.35);
+}
+.btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px 0 rgba(56, 189, 248, 0.45);
+}
+
+.btn-gold {
+  background: var(--gold-gradient);
+  color: #1e1b4b;
+  font-weight: 700;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
+}
+.btn-gold:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+/* 拖曳上傳區動畫 */
+.drag-active {
+  border-color: #38bdf8 !important;
+  background-color: rgba(56, 189, 248, 0.1) !important;
+  transform: scale(1.01);
+}
+
+/* 彈窗背景毛玻璃與可靠顯隱規則 */
+.modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+}
+.modal-backdrop.hidden, #penalty-modal.hidden, #member-verify-modal.hidden {
+  display: none !important;
+}
+.modal-backdrop:not(.hidden), #penalty-modal:not(.hidden), #member-verify-modal:not(.hidden) {
+  display: flex !important;
+}
+
+/* 骨架屏載入動畫 */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

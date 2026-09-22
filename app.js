@@ -118,8 +118,11 @@ class GuildApp {
       this.penalties = [];
     }
 
-    // 嘗試向本地 Python 後端同步 (若有啟動)
-    fetch('/api/data').then(res => res.json()).then(data => {
+    // 嘗試向本地 Python 後端同步 (若有啟動)，若在 GitHub Pages 等純靜態環境則讀取 guild_data.json
+    fetch('/api/data').then(res => {
+      if (!res.ok) throw new Error('No backend');
+      return res.json();
+    }).then(data => {
       if (data) {
         if (data.weeks && Object.keys(data.weeks).length > 0) {
           this.weeksData = data.weeks;
@@ -130,7 +133,22 @@ class GuildApp {
         }
         this.render();
       }
-    }).catch(() => {});
+    }).catch(() => {
+      // 純靜態託管環境 (如 GitHub Pages)：讀取專案內的 guild_data.json
+      fetch('guild_data.json').then(res => res.json()).then(data => {
+        if (data && (!savedData || this.members.length === 0)) {
+          if (data.weeks && Object.keys(data.weeks).length > 0) {
+            this.weeksData = data.weeks;
+            this.currentWeek = data.currentWeek || 1;
+            this.members = this.weeksData[this.currentWeek] || [];
+          }
+          if (data.penalties) {
+            this.penalties = data.penalties;
+          }
+          this.render();
+        }
+      }).catch(() => {});
+    });
   }
 
   /**
@@ -1175,8 +1193,9 @@ class GuildApp {
     }
 
     if (imgSrc) {
+      const safeSrc = (typeof imgSrc === 'string' && imgSrc.startsWith('/') && !imgSrc.startsWith('//') && !imgSrc.startsWith('data:')) ? imgSrc.slice(1) : imgSrc;
       if (imgPreview) {
-        imgPreview.src = imgSrc;
+        imgPreview.src = safeSrc;
         imgPreview.classList.remove('hidden');
       }
       if (imgEmpty) imgEmpty.classList.add('hidden');
@@ -1344,15 +1363,16 @@ class GuildApp {
   zoomVerifyImage() {
     if (!this.currentVerifyMember) return;
     const m = this.currentVerifyMember;
-    const imgSrc = m.imageUrl || m.sourceImage;
+    let imgSrc = m.imageUrl || m.sourceImage;
     if (!imgSrc) {
       this.showToast('目前尚無關聯圖片可供放大');
       return;
     }
+    const safeSrc = (typeof imgSrc === 'string' && imgSrc.startsWith('/') && !imgSrc.startsWith('//') && !imgSrc.startsWith('data:')) ? imgSrc.slice(1) : imgSrc;
     const modal = document.getElementById('ocr-lightbox-modal');
     const zoomImg = document.getElementById('ocr-lightbox-image');
     const titleEl = document.getElementById('ocr-lightbox-title');
-    if (zoomImg) zoomImg.src = imgSrc;
+    if (zoomImg) zoomImg.src = safeSrc;
     if (titleEl) {
       titleEl.textContent = `成員截圖高解析對照 - ${m.name || ''} ${m.fileName ? `(${m.fileName})` : ''}`;
     }

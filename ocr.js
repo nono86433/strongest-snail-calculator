@@ -70,8 +70,24 @@ class GuildOcrProcessor {
         throw new Error(errJson.error || `本機伺服器辨識異常 (HTTP ${serverResp.status})`);
       }
     } catch(e) {
-      console.error('後端 OCR 請求失敗:', e);
-      throw new Error(`辨識失敗: ${e.message}。請確認本機 Python 伺服器 start.bat 正常運行。`);
+      console.warn('後端 RapidOCR 伺服器不可用 (例如在 GitHub Pages)，自動切換至純前端 Tesseract 引擎...', e);
+      progressCallback(35, '本機伺服器未連線，啟動純前端辨識中...');
+      try {
+        const frontendRes = await this.recognizeBattleScreenFrontend(base64Image, imgInfo, progressCallback);
+        if (frontendRes && frontendRes.length > 0) {
+          progressCallback(100, `前端辨識完成！提取到 ${frontendRes.length} 筆資料`);
+          return {
+            success: true,
+            mode: 'FRONTEND_OCR',
+            members: frontendRes,
+            imageUrl: base64Image,
+            fileName: fileName || '上傳截圖'
+          };
+        }
+      } catch(fe) {
+        console.error('前端 OCR 亦解析失敗:', fe);
+      }
+      throw new Error(`辨識失敗: 未能從截圖中解析出數值。若在本地運行請開啟 start.bat。`);
     }
   }
 

@@ -464,7 +464,7 @@ class GuildOcrProcessor {
       : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列，每筆包含 name, leadership, hp, atk, def, pursuit（數值單位 K）。`;
 
     // 支援雙模型輪替 (若主模型 503 忙線自動切換備用模型) + 指數重試
-    const models = ['gemini-2.5-flash', 'gemma-4-26b-a4b-it'];
+    const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
     let response = null;
     let data = null;
     let lastError = null;

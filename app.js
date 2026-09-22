@@ -101,19 +101,30 @@ class GuildApp {
 
     // 讀取週次資料 (預設為空名單，讓公會長驗證圖片上傳抓取)
     const savedData = localStorage.getItem('guild_tracker_data');
+    let hasLocalData = false;
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        this.weeksData = parsed.weeks || {};
-        this.currentWeek = parsed.currentWeek || 1;
-        this.members = this.weeksData[this.currentWeek] || [];
-        this.penalties = parsed.penalties || [];
+        if (parsed && typeof parsed === 'object') {
+          this.weeksData = parsed.weeks || { 1: [] };
+          this.currentWeek = parsed.currentWeek || 1;
+          if (!this.weeksData[this.currentWeek]) {
+            const keys = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
+            this.currentWeek = keys[0] || 1;
+          }
+          this.members = this.weeksData[this.currentWeek] || [];
+          this.penalties = Array.isArray(parsed.penalties) ? parsed.penalties : [];
+          hasLocalData = true;
+        }
       } catch (e) {
         console.error('讀取本地資料失敗:', e);
       }
-    } else {
+    }
+
+    if (!hasLocalData) {
       // 首次進入，建立第1週空列表
       this.weeksData = { 1: [] };
+      this.currentWeek = 1;
       this.members = [];
       this.penalties = [];
     }
@@ -123,31 +134,45 @@ class GuildApp {
       if (!res.ok) throw new Error('No backend');
       return res.json();
     }).then(data => {
-      if (data) {
-        if (data.weeks && Object.keys(data.weeks).length > 0) {
-          this.weeksData = data.weeks;
-          this.members = this.weeksData[this.currentWeek] || [];
+      if (data && data.weeks) {
+        this.weeksData = data.weeks;
+        if (data.currentWeek && this.weeksData[data.currentWeek]) {
+          this.currentWeek = data.currentWeek;
+        } else if (!this.weeksData[this.currentWeek]) {
+          const keys = Object.keys(this.weeksData).map(Number).sort((a, b) => a - b);
+          this.currentWeek = keys[0] || 1;
         }
-        if (data.penalties) {
+        this.members = this.weeksData[this.currentWeek] || [];
+        if (Array.isArray(data.penalties)) {
           this.penalties = data.penalties;
         }
+        try {
+          localStorage.setItem('guild_tracker_data', JSON.stringify({
+            currentWeek: this.currentWeek,
+            weeks: this.weeksData,
+            penalties: this.penalties
+          }));
+        } catch (e) {}
         this.render();
       }
     }).catch(() => {
-      // 純靜態託管環境 (如 GitHub Pages)：讀取專案內的 guild_data.json
-      fetch('guild_data.json').then(res => res.json()).then(data => {
-        if (data && (!savedData || this.members.length === 0)) {
-          if (data.weeks && Object.keys(data.weeks).length > 0) {
-            this.weeksData = data.weeks;
+      // 純靜態託管環境 (如 GitHub Pages)：
+      // 只有在使用者首次進入且完全無本地快照 (!hasLocalData) 時，才載入初始配置
+      // 絕不因 members 為空而擅自覆蓋使用者的清空/刪除操作！
+      if (!hasLocalData) {
+        fetch('guild_data.json').then(res => res.json()).then(data => {
+          if (data && !localStorage.getItem('guild_tracker_data')) {
+            this.weeksData = data.weeks || { 1: [] };
             this.currentWeek = data.currentWeek || 1;
             this.members = this.weeksData[this.currentWeek] || [];
+            if (Array.isArray(data.penalties)) {
+              this.penalties = data.penalties;
+            }
+            this.saveToStorage();
+            this.render();
           }
-          if (data.penalties) {
-            this.penalties = data.penalties;
-          }
-          this.render();
-        }
-      }).catch(() => {});
+        }).catch(() => {});
+      }
     });
   }
 
@@ -161,10 +186,40 @@ class GuildApp {
       weeks: this.weeksData,
       penalties: this.penalties
     };
-    localStorage.setItem('guild_tracker_data', JSON.stringify(payload));
-    localStorage.setItem('guild_formula_config', JSON.stringify(this.formulaConfig));
 
-    // 同步到 Python 伺服器
+    try {
+      localStorage.setItem('guild_tracker_data', JSON.stringify(payload));
+    } catch (err) {
+      console.warn('localStorage 儲存空間已滿，正在精簡圖片數據後重新儲存...', err);
+      try {
+        // 若空間不足，將超過 50KB 的 base64 圖片移除，確保成員核心數據 100% 儲存成功
+        const slimWeeks = {};
+        for (const [w, mems] of Object.entries(this.weeksData)) {
+          slimWeeks[w] = (mems || []).map(m => {
+            const copy = { ...m };
+            if (copy.imageUrl && copy.imageUrl.length > 50000 && copy.imageUrl.startsWith('data:')) {
+              delete copy.imageUrl;
+            }
+            delete copy.sourceImage;
+            return copy;
+          });
+        }
+        const slimPayload = {
+          currentWeek: this.currentWeek,
+          weeks: slimWeeks,
+          penalties: this.penalties
+        };
+        localStorage.setItem('guild_tracker_data', JSON.stringify(slimPayload));
+      } catch (e2) {
+        console.error('儲存至 localStorage 失敗:', e2);
+      }
+    }
+
+    try {
+      localStorage.setItem('guild_formula_config', JSON.stringify(this.formulaConfig));
+    } catch (e) {}
+
+    // 同步到 Python 伺服器 (若有啟動)
     fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -316,6 +371,7 @@ class GuildApp {
       this.weeksData[weekNum] = [];
     }
     this.members = this.weeksData[weekNum];
+    this.saveToStorage();
     this.render();
   }
 
@@ -342,18 +398,23 @@ class GuildApp {
     const targetWeek = this.currentWeek;
 
     if (weekKeys.length <= 1) {
-      if (confirm(`目前僅剩第 ${targetWeek} 週。確定要清空此週次的所有成員數據並重設嗎？`)) {
-        this.weeksData[targetWeek] = [];
-        this.members = [];
-        this.saveToStorage();
-        this.render();
-        this.showToast(`已清空並重設第 ${targetWeek} 週！`);
-      }
+      const memberCount = (this.members || []).length;
+      const confirmMsg = memberCount > 0 
+        ? `目前為第 ${targetWeek} 週（包含 ${memberCount} 位成員資料）。\n確定要刪除並徹底清除本週所有名冊資料嗎？\n清除後重新整理將不再復原，重新上傳圖片可記錄新資料。`
+        : `目前第 ${targetWeek} 週已無成員資料。確定要重設本週名冊嗎？`;
+
+      if (!confirm(confirmMsg)) return;
+
+      this.weeksData = { [targetWeek]: [] };
+      this.members = [];
+      this.saveToStorage();
+      this.render();
+      this.showToast(`已徹底清除第 ${targetWeek} 週所有成員資料！`);
       return;
     }
 
     const memberCount = (this.weeksData[targetWeek] || []).length;
-    const msg = `確定要刪除【第 ${targetWeek} 週】嗎？\n該週包含 ${memberCount} 位成員數據，刪除後將無法復原！`;
+    const msg = `確定要刪除【第 ${targetWeek} 週】名冊嗎？\n該週包含 ${memberCount} 位成員數據，刪除後將無法復原！`;
     if (!confirm(msg)) return;
 
     delete this.weeksData[targetWeek];

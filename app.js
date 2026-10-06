@@ -520,6 +520,11 @@ class GuildApp {
       } catch (err) {
         console.error(`檔案 ${file.name} 辨識失敗:`, err);
       }
+
+      // 批次防併發保護：每張圖片間加入 350ms 平滑微延遲，避免短時間打爆 API 頻率限制
+      if (i < fileList.length - 1) {
+        await new Promise(r => setTimeout(r, 350));
+      }
     }
 
     progressBar.style.width = '100%';

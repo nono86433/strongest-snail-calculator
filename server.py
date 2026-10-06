@@ -327,6 +327,8 @@ def analyze_image_dynamic(img):
             # 特殊字體筆劃黏合校正
             if cleaned in ['無哈密瓜', '無散哈密瓜', '無颜哈密瓜', '無散哈蜜瓜', '無顏哈蜜瓜', '無敵哈蜜瓜']:
                 cleaned = '無敵哈密瓜'
+            if cleaned in ['李老閣', '李老板', '李老閤', '李老闌']:
+                cleaned = '李老闆'
                 
             bw = it['w']
             bh = it['h']

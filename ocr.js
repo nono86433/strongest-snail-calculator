@@ -87,10 +87,17 @@ class GuildOcrProcessor {
     if (this.geminiApiKey) {
       try {
         progressCallback(30, '🤖 Gemini AI 視覺辨識中，請稍候...');
-        const aiResult = await this.recognizeWithGemini(base64Image, isSnailGameScreen);
+        const aiResult = await this.recognizeWithGemini(base64Image, isSnailGameScreen, progressCallback);
         if (aiResult && aiResult.length > 0) {
-          progressCallback(100, `✅ Gemini AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
-          return { success: true, mode: 'AI_VISION', members: aiResult, fileName };
+          // 檢驗數據完整性：若四圍與領導力完全為 0 或小於有效閥值，不應視為有效
+          const isValid = aiResult.some(m => (m.hp > 0 || m.atk > 0) && m.leadership > 0);
+          if (isValid) {
+            progressCallback(100, `✅ Gemini AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
+            return { success: true, mode: 'AI_VISION', members: aiResult, fileName };
+          } else {
+            console.warn('[Gemini] 辨識數值全為0或不合理，自動嘗試備用引擎');
+            progressCallback(35, '⚠️ Gemini 數值不完整，嘗試備用引擎...');
+          }
         } else {
           progressCallback(35, '⚠️ Gemini 回傳空結果，嘗試備用引擎...');
         }
@@ -185,16 +192,16 @@ class GuildOcrProcessor {
       } else {
         // 直立全螢幕截圖（依遊戲 UI 實際比例精確定位）
         progressCallback(45, '鎖定四圍屬性欄位 (血量/攻擊/防禦/追擊)...');
-        // 四圍屬性位於底部面板上半段 (Y: 82.5% ~ 90.0%)
-        statsCrop = await this.cropAndEnhance(base64Image, 0.04, 0.825, 0.96, 0.900, 150);
+        // 四圍屬性位於底部面板上半段 (Y: 82.0% ~ 90.5%)
+        statsCrop = await this.cropAndEnhance(base64Image, 0.04, 0.820, 0.96, 0.905, 150);
         
         progressCallback(60, '鎖定領導力進度條數值...');
-        // 領導力進度條位於底部面板下半段 (Y: 90.5% ~ 96.5%)
-        leadCrop = await this.cropAndEnhance(base64Image, 0.04, 0.905, 0.55, 0.965, 150);
+        // 領導力進度條位於底部面板下半段 (Y: 90.0% ~ 96.5%)
+        leadCrop = await this.cropAndEnhance(base64Image, 0.04, 0.900, 0.55, 0.965, 150);
 
         progressCallback(75, '鎖定玩家標註暱稱...');
-        // 玩家暱稱通常標註於棋盤中央或中下方 (Y: 45.0% ~ 78.0%)，避開上方敵軍資訊區
-        nameCrop = await this.cropAndEnhance(base64Image, 0.10, 0.450, 0.90, 0.780, 160);
+        // 玩家暱稱標註於棋盤中央至下方 (Y: 30.0% ~ 83.5%)，覆蓋李老闆等底部標籤
+        nameCrop = await this.cropAndEnhance(base64Image, 0.10, 0.300, 0.90, 0.835, 160);
       }
 
       progressCallback(85, '執行光學字元解析 (OCR)...');
@@ -517,7 +524,7 @@ class GuildOcrProcessor {
   /**
    * Gemini Vision 呼叫（支援 JPG/PNG 自動偵測 MIME，完整錯誤日誌）
    */
-  async recognizeWithGemini(base64Image, isVerticalBattleScreen = false) {
+  async recognizeWithGemini(base64Image, isVerticalBattleScreen = false, progressCallback = () => {}) {
     if (!this.geminiApiKey) return null;
 
     // 強健解析 Base64 與 MIME 格式 (相容所有瀏覽器格式)
@@ -532,7 +539,7 @@ class GuildOcrProcessor {
       ? `你是一位《最強蝸牛》手遊公會戰報數據解析專家。請精確解析這張「兵種演練上陣介面」截圖：
 
 【核心規則：玩家名稱識別與嚴格防呆】
-1. 真正的玩家名稱：通常由公會長或玩家手動打字標註在「中間兵種棋盤格子區域」（例如大字標註 978、Europa、命不語 等）。若標註開頭有 + 或 # 等符號（如 +978、#978），請去除符號取其核心名字（如 978）。
+1. 真正的玩家名稱：通常由公會長或玩家手動打字標註在「中間兵種棋盤格子區域」（例如大字標註 978、Europa、命不語、李老闆 等）。若標註開頭有 + 或 # 等符號（如 +978、#978），請去除符號取其核心名字（如 978）。
 2. 嚴格禁止抓取遊戲系統資料作為玩家名稱：
    - 絕對禁止抓取左上角/右上角的俱樂部求助或聊天氣泡（如「求幫助+1」、「求幫助」、「求助」、「求救」、顏文字如 (~_~) 等）！
    - 絕對禁止抓取右上角小電視內的敵軍資訊與戰鬥判定（如「工兵8005」、「刀客」、「失敗」、「勝利」、「平手」、「敵軍戰力」等）！
@@ -541,7 +548,7 @@ class GuildOcrProcessor {
    - 若畫面中央棋盤確實沒有任何玩家手動標註文字，name 請填空字串 ""，絕對不能拿任何系統文字或敵軍文字充數！
 
 【數值提取規則】
-1. 領導力：位於底部進度條（如 4251/4251 或 3751/3751，取出左側整數 4251 或 3751）。
+1. 領導力：位於底部進度條（如 4251/4251 或 3540/3540，取出左側整數 4251 或 3540）。
 2. 四圍屬性：位於兵種棋盤正下方一排四個數值：生命/血量(藥丸)、攻擊(劍)、防禦(盾)、追擊(風)。
    帶有 M（如 167M, 30.5M, 27.2M, 28.2M）請乘以 1000 轉為 (K) 整數（如 167000, 30500, 27200, 28200）。
 
@@ -565,7 +572,7 @@ class GuildOcrProcessor {
     let lastError = null;
 
     for (const model of models) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.geminiApiKey}`;
           response = await fetch(url, {
@@ -594,10 +601,22 @@ class GuildOcrProcessor {
             break;
           }
 
+          // 若遇到 429 頻率限制 (Too Many Requests / Quota Exceeded)，智能退避冷卻後自動重試
+          const is429 = response.status === 429 || (data && data.error && (data.error.code === 429 || data.error.status === 'RESOURCE_EXHAUSTED'));
+          if (is429) {
+            const waitSec = attempt === 1 ? 2.5 : (attempt === 2 ? 4.0 : 6.0);
+            console.warn(`[AI] 模型 [${model}] 觸發頻率保護 (429)，自動冷卻 ${waitSec} 秒後重試 (第 ${attempt}/3 次)...`);
+            if (typeof progressCallback === 'function') {
+              progressCallback(40, `⏳ 觸發 API 頻率保護，等待 ${waitSec} 秒後自動重試第 ${attempt} 次...`);
+            }
+            await new Promise(r => setTimeout(r, waitSec * 1000));
+            continue;
+          }
+
           // 若遇到 503 伺服器忙線，稍微延遲後重試
           if (response.status === 503 || (data && data.error && data.error.code === 503)) {
-            console.warn(`[AI] 模型 [${model}] 暫時忙線 (503)，1秒後自動重試...`);
-            await new Promise(r => setTimeout(r, 1000));
+            console.warn(`[AI] 模型 [${model}] 暫時忙線 (503)，1.5秒後自動重試...`);
+            await new Promise(r => setTimeout(r, 1500));
             continue;
           }
 
@@ -607,8 +626,8 @@ class GuildOcrProcessor {
           break;
         } catch (fetchErr) {
           lastError = fetchErr;
-          console.warn(`[AI] 模型 [${model}] 網路抖動，1秒後重試:`, fetchErr.message);
-          await new Promise(r => setTimeout(r, 1000));
+          console.warn(`[AI] 模型 [${model}] 網路抖動，1.5秒後重試:`, fetchErr.message);
+          await new Promise(r => setTimeout(r, 1500));
         }
       }
 

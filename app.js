@@ -38,6 +38,9 @@ class GuildApp {
     this.currentOcrImage = null;
     this.activePendingIndex = 0; // 當前在校對對照表中選中的成員索引
 
+    this.pendingExcelResults = []; // 待校對的 Excel 結果
+    this.pendingExcelFileName = '';
+
     this.currentVerifyIndex = 0; // 當前在「成員截圖核對與資料校正」視窗中的成員索引
     this.currentVerifyMember = null;
 
@@ -1046,6 +1049,374 @@ class GuildApp {
     XLSX.utils.book_append_sheet(wb, ws, `第${this.currentWeek}週統計`);
     XLSX.writeFile(wb, `最強蝸牛公會數據_第${this.currentWeek}週.xlsx`);
     this.showToast('已匯出 Excel 檔案！');
+  }
+
+  /**
+   * 處理上傳 Excel 檔案 (.xlsx, .xls, .csv)
+   */
+  async handleExcelUpload(files) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const fileName = file.name;
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
+      alert('請選取有效的 Excel 檔案 (.xlsx, .xls) 或 CSV 檔案！');
+      return;
+    }
+
+    try {
+      if (typeof XLSX === 'undefined') {
+        throw new Error('SheetJS (XLSX) 函式庫尚未載入完成，請確認網路連線或重新整理頁面');
+      }
+
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new Error('Excel 檔案內未找到任何工作表！');
+      }
+
+      // 讀取第一個工作表
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+      if (!rows || rows.length === 0) {
+        throw new Error('選取的 Excel 工作表內容為空！');
+      }
+
+      const parsedMembers = this.parseExcelRows(rows);
+      if (parsedMembers.length === 0) {
+        throw new Error('未能從 Excel 中識別到有效成員數據，請確認檔案包含「暱稱」與各項屬性數值！');
+      }
+
+      this.pendingExcelResults = parsedMembers;
+      this.pendingExcelFileName = fileName;
+
+      // 顯示預覽 Modal
+      const filenameEl = document.getElementById('excel-import-filename');
+      const badgeEl = document.getElementById('excel-import-count-badge');
+      if (filenameEl) filenameEl.textContent = `檔案名稱：${fileName} (工作表: ${firstSheetName})`;
+      if (badgeEl) badgeEl.textContent = `成功讀取 ${parsedMembers.length} 筆`;
+
+      this.renderExcelImportTable();
+      this.openModal('excel-import-modal');
+
+      // 重設 input 允許重複選取相同檔名
+      const inputEl = document.getElementById('excel-file-input');
+      if (inputEl) inputEl.value = '';
+    } catch (err) {
+      console.error('Excel 解析異常:', err);
+      alert('Excel 讀取失敗: ' + (err.message || String(err)));
+    }
+  }
+
+  /**
+   * 解析 Excel 二維行陣列為會員物件 (支援各種表頭別名、無表頭容錯與單位自適應)
+   */
+  parseExcelRows(rows) {
+    if (!rows || rows.length === 0) return [];
+
+    let headerRowIdx = -1;
+    let colMap = { name: -1, leadership: -1, hp: -1, atk: -1, def: -1, pursuit: -1 };
+
+    // 掃描前 10 行尋找表頭行
+    for (let r = 0; r < Math.min(10, rows.length); r++) {
+      const row = rows[r];
+      if (!Array.isArray(row)) continue;
+
+      let foundMatches = 0;
+      let tempMap = { name: -1, leadership: -1, hp: -1, atk: -1, def: -1, pursuit: -1 };
+
+      row.forEach((cell, colIdx) => {
+        const text = String(cell || '').trim();
+        if (!text) return;
+        const clean = text.replace(/[\s\(\)（）_]/g, '');
+
+        // 暱稱欄位
+        if (tempMap.name === -1 && /^(遊戲暱稱|暱稱|成員|玩家|名字|名稱|姓名|Name|ID|帳號|會員)$/i.test(clean)) {
+          tempMap.name = colIdx;
+          foundMatches++;
+        }
+        // 領導力欄位
+        else if (tempMap.leadership === -1 && /^(領導力|領導|統帥|統率|領|Leadership|Leader|Lead)$/i.test(clean)) {
+          tempMap.leadership = colIdx;
+          foundMatches++;
+        }
+        // 血量欄位
+        else if (tempMap.hp === -1 && /^(血量|生命|HP|血量K|生命K|HPK|生命值|血|生命力)$/i.test(clean)) {
+          tempMap.hp = colIdx;
+          foundMatches++;
+        }
+        // 攻擊欄位
+        else if (tempMap.atk === -1 && /^(攻擊|物攻|ATK|攻擊K|物攻K|ATKK|攻擊力|攻)$/i.test(clean)) {
+          tempMap.atk = colIdx;
+          foundMatches++;
+        }
+        // 防禦欄位
+        else if (tempMap.def === -1 && /^(防禦|防御|物防|DEF|防禦K|防御K|物防K|DEFK|防禦力|防)$/i.test(clean)) {
+          tempMap.def = colIdx;
+          foundMatches++;
+        }
+        // 追擊欄位
+        else if (tempMap.pursuit === -1 && /^(追擊|追击|SPD|Pursuit|追擊K|追击K|SPDK|追擊力|追)$/i.test(clean)) {
+          tempMap.pursuit = colIdx;
+          foundMatches++;
+        }
+      });
+
+      // 只要匹配到暱稱 + 任一數值，或者匹配到至少 2 個關鍵表頭
+      if (foundMatches >= 2 || (tempMap.name !== -1 && foundMatches >= 1)) {
+        headerRowIdx = r;
+        colMap = tempMap;
+        break;
+      }
+    }
+
+    // 若未識別到表頭，採預設索引對應 [0: 暱稱, 1: 領導, 2: 血量, 3: 攻擊, 4: 防禦, 5: 追擊]
+    if (headerRowIdx === -1) {
+      colMap = { name: 0, leadership: 1, hp: 2, atk: 3, def: 4, pursuit: 5 };
+    }
+
+    const members = [];
+    const dataStartRow = headerRowIdx + 1;
+
+    for (let r = dataStartRow; r < rows.length; r++) {
+      const row = rows[r];
+      if (!Array.isArray(row) || row.length === 0) continue;
+
+      let rawName = colMap.name !== -1 ? String(row[colMap.name] || '').trim() : '';
+      if (!rawName || rawName === 'undefined' || rawName === 'null') continue;
+
+      // 排除總計/合計/說明等非成員行
+      if (/^(合計|總計|平均|總和|備註|說明|統計|總計數|Average|Total)$/i.test(rawName)) continue;
+
+      // 提取數值
+      let leadership = colMap.leadership !== -1 ? this.parseExcelStatNumber(row[colMap.leadership]) : 0;
+      let hp = colMap.hp !== -1 ? this.parseExcelStatNumber(row[colMap.hp]) : 0;
+      let atk = colMap.atk !== -1 ? this.parseExcelStatNumber(row[colMap.atk]) : 0;
+      let def = colMap.def !== -1 ? this.parseExcelStatNumber(row[colMap.def]) : 0;
+      let pursuit = colMap.pursuit !== -1 ? this.parseExcelStatNumber(row[colMap.pursuit]) : 0;
+
+      // 領導力若是 3540/3540 等格式
+      if (typeof row[colMap.leadership] === 'string' && row[colMap.leadership].includes('/')) {
+        const parts = row[colMap.leadership].split('/');
+        leadership = parseInt(parts[0], 10) || leadership;
+      }
+
+      // 名字清洗（若包含開頭前綴符號）
+      let cleanName = rawName.replace(/^[+＋\-_#@\s]+/, '').trim();
+
+      const memberObj = {
+        name: cleanName || rawName,
+        leadership,
+        hp,
+        atk,
+        def,
+        pursuit
+      };
+
+      const calculated = this.calculateMetrics(memberObj);
+      members.push(calculated);
+    }
+
+    return members;
+  }
+
+  /**
+   * 智慧轉換 Excel 儲存格數值為標準整數 (單位: K)
+   */
+  parseExcelStatNumber(val) {
+    if (val === undefined || val === null || val === '') return 0;
+    if (typeof val === 'number') {
+      if (val > 1000000) return Math.round(val / 1000);
+      return Math.round(val);
+    }
+
+    let s = String(val).trim().replace(/,/g, '');
+    const isM = /[Mm]/.test(s);
+    const cleanNum = s.replace(/[^\d.]/g, '');
+    if (!cleanNum) return 0;
+    let num = parseFloat(cleanNum);
+    if (isNaN(num)) return 0;
+
+    if (isM) {
+      return Math.round(num * 1000);
+    }
+    if (num > 1000000) {
+      return Math.round(num / 1000);
+    }
+    return Math.round(num);
+  }
+
+  /**
+   * 渲染 Excel 匯入校對預覽清單
+   */
+  renderExcelImportTable() {
+    const tbody = document.getElementById('excel-import-tbody');
+    if (!tbody) return;
+
+    if (!this.pendingExcelResults || this.pendingExcelResults.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="13" class="text-center py-12 text-slate-500">無有效成員資料，請重新選取檔案。</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = this.pendingExcelResults.map((m, idx) => {
+      return `
+        <tr class="hover:bg-slate-900 border-b border-slate-800/80 transition-colors">
+          <td class="p-2 text-center font-mono text-slate-500">${idx + 1}</td>
+          <td class="p-1">
+            <input type="text" value="${this.escapeHtml(m.name)}" 
+              onchange="app.updateExcelPendingField(${idx}, 'name', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-white font-bold text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-1">
+            <input type="number" value="${m.leadership}" 
+              onchange="app.updateExcelPendingField(${idx}, 'leadership', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-right text-cyan-300 font-mono text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-1">
+            <input type="number" value="${m.hp}" 
+              onchange="app.updateExcelPendingField(${idx}, 'hp', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-right text-slate-200 font-mono text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-1">
+            <input type="number" value="${m.atk}" 
+              onchange="app.updateExcelPendingField(${idx}, 'atk', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-right text-slate-200 font-mono text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-1">
+            <input type="number" value="${m.def}" 
+              onchange="app.updateExcelPendingField(${idx}, 'def', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-right text-slate-200 font-mono text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-1">
+            <input type="number" value="${m.pursuit}" 
+              onchange="app.updateExcelPendingField(${idx}, 'pursuit', this.value)"
+              class="w-full bg-slate-900 border border-slate-700/80 rounded px-2 py-1 text-right text-slate-200 font-mono text-xs focus:border-cyan-400 focus:outline-none">
+          </td>
+          <td class="p-2 text-right font-mono text-indigo-300 font-semibold">${m.calc_def}</td>
+          <td class="p-2 text-right font-mono text-orange-300 font-semibold">${m.calc_atk}</td>
+          <td class="p-2 text-right font-mono text-amber-300 font-semibold">${m.calc_pick}</td>
+          <td class="p-2 text-right font-mono text-cyan-300 font-bold">${m.calc_total}</td>
+          <td class="p-2 text-right font-mono text-cyan-400 font-extrabold">${m.calc_avg}</td>
+          <td class="p-1 text-center">
+            <button onclick="app.removeExcelPendingRow(${idx})" class="p-1 text-slate-500 hover:text-rose-400 transition" title="移除此列">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  /**
+   * 更新 Excel 預覽清單中的特定欄位並即時重新計算
+   */
+  updateExcelPendingField(idx, field, val) {
+    if (!this.pendingExcelResults || !this.pendingExcelResults[idx]) return;
+    const item = this.pendingExcelResults[idx];
+    if (field === 'name') {
+      item.name = String(val).trim();
+    } else {
+      item[field] = parseFloat(val) || 0;
+    }
+    const recalced = this.calculateMetrics(item);
+    this.pendingExcelResults[idx] = recalced;
+    this.renderExcelImportTable();
+  }
+
+  /**
+   * 移除 Excel 預覽清單中的特定行
+   */
+  removeExcelPendingRow(idx) {
+    if (!this.pendingExcelResults) return;
+    this.pendingExcelResults.splice(idx, 1);
+    const badgeEl = document.getElementById('excel-import-count-badge');
+    if (badgeEl) badgeEl.textContent = `成功讀取 ${this.pendingExcelResults.length} 筆`;
+    this.renderExcelImportTable();
+  }
+
+  /**
+   * 將 Excel 辨識數據寫入公會名冊 (支援 overwrite 完全覆蓋 與 merge 追加/更新)
+   */
+  applyExcelResults(mode = 'merge') {
+    if (!this.pendingExcelResults || this.pendingExcelResults.length === 0) {
+      alert('目前沒有待寫入的 Excel 資料！');
+      return;
+    }
+
+    if (mode === 'overwrite') {
+      if (!confirm(`確定要清除第 ${this.currentWeek} 週現有名單，改為這 ${this.pendingExcelResults.length} 位 Excel 成員嗎？`)) {
+        return;
+      }
+      this.members = [...this.pendingExcelResults];
+    } else {
+      let updatedCount = 0;
+      let newCount = 0;
+      this.pendingExcelResults.forEach(newM => {
+        const existIdx = this.members.findIndex(m => (m.name || '').toLowerCase() === (newM.name || '').toLowerCase());
+        if (existIdx >= 0) {
+          this.members[existIdx] = { ...this.members[existIdx], ...newM };
+          updatedCount++;
+        } else {
+          this.members.push(newM);
+          newCount++;
+        }
+      });
+    }
+
+    // 重算指標與更新
+    this.members = this.members.map(m => this.calculateMetrics(m));
+    this.saveToStorage();
+    this.render();
+    this.closeModal('excel-import-modal');
+    this.showToast(`🎉 成功從 Excel 匯入 ${this.pendingExcelResults.length} 位成員資料！`);
+    this.pendingExcelResults = [];
+  }
+
+  /**
+   * 下載官方標準 Excel 匯入範本
+   */
+  downloadExcelTemplate() {
+    const templateRows = [
+      {
+        "遊戲暱稱": "Europa",
+        "領導力": 3751,
+        "血量(K)": 107000,
+        "攻擊(K)": 20600,
+        "防禦(K)": 19200,
+        "追擊(K)": 21300
+      },
+      {
+        "遊戲暱稱": "命不語",
+        "領導力": 3402,
+        "血量(K)": 100000,
+        "攻擊(K)": 21700,
+        "防禦(K)": 16600,
+        "追擊(K)": 23500
+      },
+      {
+        "遊戲暱稱": "李老闆",
+        "領導力": 3540,
+        "血量(K)": 98100,
+        "攻擊(K)": 22100,
+        "防禦(K)": 17200,
+        "追擊(K)": 19700
+      },
+      {
+        "遊戲暱稱": "四歲",
+        "領導力": 2940,
+        "血量(K)": 64900,
+        "攻擊(K)": 13300,
+        "防禦(K)": 9370,
+        "追擊(K)": 11700
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "公會戰力名冊");
+    XLSX.writeFile(wb, "最強蝸牛公會名冊_匯入範本.xlsx");
+    this.showToast('已下載 Excel 匯入標準範本！');
   }
 
   /**

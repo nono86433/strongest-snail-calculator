@@ -329,6 +329,8 @@ def analyze_image_dynamic(img):
                 cleaned = '無敵哈密瓜'
             if cleaned in ['李老閣', '李老板', '李老閤', '李老闌']:
                 cleaned = '李老闆'
+            if cleaned in ['四崴', '四岁', '四歲']:
+                cleaned = '四歲'
                 
             bw = it['w']
             bh = it['h']

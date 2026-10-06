@@ -83,29 +83,31 @@ class GuildOcrProcessor {
     // 2. 橫條式底欄截圖 (ratio > 1.2 且 height < 450，如局部截取底盤數值)
     const isSnailGameScreen = imgInfo.ratio < 0.85 || (imgInfo.ratio > 1.2 && imgInfo.height < 500);
 
-    // 1. 若有配置 Gemini API Key，調用高精度 AI 多模態辨識
+    // 1. 若有配置 Gemini API Key，調用高精度 AI 多模態辨識 (含雙重呼叫重試，防範偶發網路抖動或超時)
     if (this.geminiApiKey) {
-      try {
-        progressCallback(30, '🤖 Gemini AI 視覺辨識中，請稍候...');
-        const aiResult = await this.recognizeWithGemini(base64Image, isSnailGameScreen, progressCallback);
-        if (aiResult && aiResult.length > 0) {
-          // 檢驗數據完整性：若四圍與領導力完全為 0 或小於有效閥值，不應視為有效
-          const isValid = aiResult.some(m => (m.hp > 0 || m.atk > 0) && m.leadership > 0);
-          if (isValid) {
-            progressCallback(100, `✅ Gemini AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
-            return { success: true, mode: 'AI_VISION', members: aiResult, fileName };
-          } else {
-            console.warn('[Gemini] 辨識數值全為0或不合理，自動嘗試備用引擎');
-            progressCallback(35, '⚠️ Gemini 數值不完整，嘗試備用引擎...');
+      for (let run = 1; run <= 2; run++) {
+        try {
+          progressCallback(30, run === 1 ? '🤖 Gemini AI 視覺辨識中，請稍候...' : '🔄 AI 重新解析中，請稍候...');
+          const aiResult = await this.recognizeWithGemini(base64Image, isSnailGameScreen, progressCallback);
+          if (aiResult && aiResult.length > 0) {
+            // 檢驗數據完整性：若四圍與領導力完全為 0 或小於有效閥值，不應視為有效
+            const isValid = aiResult.some(m => (m.hp > 0 || m.atk > 0) && m.leadership > 0);
+            if (isValid) {
+              progressCallback(100, `✅ Gemini AI 辨識完成！抓取到 ${aiResult.length} 筆會員資料`);
+              return { success: true, mode: 'AI_VISION', members: aiResult, fileName };
+            } else {
+              console.warn(`[Gemini] 第 ${run} 次辨識數值不完整，準備重試`);
+            }
           }
-        } else {
-          progressCallback(35, '⚠️ Gemini 回傳空結果，嘗試備用引擎...');
+        } catch (err) {
+          const errMsg = err.message || String(err);
+          console.warn(`[Gemini] 第 ${run} 次嘗試異常:`, errMsg);
+          if (run === 1) {
+            await new Promise(r => setTimeout(r, 1200));
+          }
         }
-      } catch (err) {
-        const errMsg = err.message || String(err);
-        console.warn('[Gemini] 辨識異常，自動切換至備用辨識流程:', errMsg);
-        progressCallback(35, '啟動備用辨識引擎...');
       }
+      progressCallback(35, '啟動備用辨識引擎...');
     }
 
     // 2. 調用本機 Python RapidOCR 神經網路引擎 (純動態辨識)
@@ -253,13 +255,14 @@ class GuildOcrProcessor {
         pursuit: stats.pursuit || 0
       };
 
-      // 如果四圍與領導力完全未能提取到任何數字，自動嘗試全圖表格 OCR 作為備援方案
-      if (!stats.hp && !stats.atk && !stats.def && !stats.pursuit && !leadership) {
+      // 嚴格數據驗證：若攻擊與防禦都為 0，且領導力為 0，判定為未成功提取有效數值
+      if (member.atk === 0 && member.def === 0 && member.leadership === 0) {
         progressCallback(90, '嘗試全畫面文字檢測...');
         const tableRes = await this.recognizeTableFrontend(base64Image, progressCallback);
         if (tableRes && tableRes.members && tableRes.members.length > 0) {
           return tableRes;
         }
+        throw new Error('截圖未能在固定位置提取到有效四圍數值與領導力');
       }
 
       progressCallback(100, `辨識完成！成功抓取成員 [${member.name || '未命名'}]`);
@@ -362,7 +365,7 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 解析四圍屬性文字（自動識別 M 轉換為 K，過濾雜訊符號）
+   * 解析四圍屬性文字（自動識別 M 轉換為 K，過濾雜訊符號，絕不將單個數字乘 1000 誤認為血量）
    */
   parseBattleStatsText(text) {
     if (!text) return { hp: 0, atk: 0, def: 0, pursuit: 0 };
@@ -386,10 +389,22 @@ class GuildOcrProcessor {
       let val = parseFloat(numStr);
       if (isNaN(val) || val <= 0) continue;
       const unit = (m[2] || '').toUpperCase();
-      if (['M', 'V', 'W', 'N', '1'].includes(unit) || val < 1000) {
+
+      // 雜訊過濾：若無單位且小於 10 的純整數 (例如單獨的 1, 2, 3, 4)，為圖標雜訊，堅決忽略
+      if (!unit && val < 10 && !numStr.includes('.')) {
+        continue;
+      }
+
+      if (['M', 'V', 'W', 'N', '1'].includes(unit)) {
         val = Math.round(val * 1000);
-      } else {
+      } else if (val < 1000 && numStr.includes('.')) {
+        // 帶小數點之數值 (如 64.9, 13.3) 屬於以 M 為單位
+        val = Math.round(val * 1000);
+      } else if (val >= 1000) {
         val = Math.round(val);
+      } else {
+        // 小於 1000 且無單位無小數點之純數字視為雜訊
+        continue;
       }
       values.push(val);
     }

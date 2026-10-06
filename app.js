@@ -296,27 +296,36 @@ class GuildApp {
       }
     });
 
-    // 拖曳上傳支援
-    const dropArea = document.body;
-    dropArea.addEventListener('dragover', (e) => {
+    // 拖曳上傳支援 (支援直接丟入 Excel / CSV 表格或截圖)
+    window.addEventListener('dragover', (e) => {
       e.preventDefault();
       document.body.classList.add('drag-active');
     });
-    dropArea.addEventListener('dragleave', (e) => {
+    window.addEventListener('dragleave', (e) => {
       if (!e.relatedTarget) {
         document.body.classList.remove('drag-active');
       }
     });
-    dropArea.addEventListener('drop', (e) => {
+    window.addEventListener('drop', (e) => {
       e.preventDefault();
       document.body.classList.remove('drag-active');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const verifyModal = document.getElementById('member-verify-modal');
-        if (verifyModal && !verifyModal.classList.contains('hidden')) {
-          this.handleVerifyImageFile(e.dataTransfer.files);
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const files = e.dataTransfer.files;
+        const firstFile = files[0];
+        const ext = ((firstFile && firstFile.name) || '').split('.').pop().toLowerCase();
+
+        // 若丟入的是 Excel / CSV 檔案，直接導向 handleExcelUpload
+        if (['xlsx', 'xls', 'csv'].includes(ext)) {
+          this.handleExcelUpload(files);
           return;
         }
-        this.handleImageUpload(e.dataTransfer.files);
+
+        const verifyModal = document.getElementById('member-verify-modal');
+        if (verifyModal && !verifyModal.classList.contains('hidden')) {
+          this.handleVerifyImageFile(files);
+          return;
+        }
+        this.handleImageUpload(files);
       }
     });
 
@@ -1057,16 +1066,18 @@ class GuildApp {
   async handleExcelUpload(files) {
     if (!files || files.length === 0) return;
     const file = files[0];
-    const fileName = file.name;
+    const fileName = file.name || '未命名檔案';
     const ext = fileName.split('.').pop().toLowerCase();
     if (!['xlsx', 'xls', 'csv'].includes(ext)) {
       alert('請選取有效的 Excel 檔案 (.xlsx, .xls) 或 CSV 檔案！');
       return;
     }
 
+    this.showToast(`正在讀取並解析檔案【${fileName}】...`);
+
     try {
       if (typeof XLSX === 'undefined') {
-        throw new Error('SheetJS (XLSX) 函式庫尚未載入完成，請確認網路連線或重新整理頁面');
+        throw new Error('瀏覽器尚未載入 SheetJS (XLSX) 解析套件，請檢查網路連線或重新整理頁面！');
       }
 
       const data = await file.arrayBuffer();
@@ -1085,7 +1096,7 @@ class GuildApp {
 
       const parsedMembers = this.parseExcelRows(rows);
       if (parsedMembers.length === 0) {
-        throw new Error('未能從 Excel 中識別到有效成員數據，請確認檔案包含「暱稱」與各項屬性數值！');
+        throw new Error('未能從 Excel 中識別到有效成員數據，請確認檔案包含玩家暱稱與屬性數值！');
       }
 
       this.pendingExcelResults = parsedMembers;
@@ -1095,17 +1106,18 @@ class GuildApp {
       const filenameEl = document.getElementById('excel-import-filename');
       const badgeEl = document.getElementById('excel-import-count-badge');
       if (filenameEl) filenameEl.textContent = `檔案名稱：${fileName} (工作表: ${firstSheetName})`;
-      if (badgeEl) badgeEl.textContent = `成功讀取 ${parsedMembers.length} 筆`;
+      if (badgeEl) badgeEl.textContent = `成功讀取 ${parsedMembers.length} 筆成員資料`;
 
       this.renderExcelImportTable();
       this.openModal('excel-import-modal');
-
-      // 重設 input 允許重複選取相同檔名
-      const inputEl = document.getElementById('excel-file-input');
-      if (inputEl) inputEl.value = '';
+      this.showToast(`成功解析 ${parsedMembers.length} 筆資料，請於視窗中校對！`);
     } catch (err) {
       console.error('Excel 解析異常:', err);
       alert('Excel 讀取失敗: ' + (err.message || String(err)));
+    } finally {
+      // 重設 input 允許重複選取相同檔名
+      const inputEl = document.getElementById('excel-file-input');
+      if (inputEl) inputEl.value = '';
     }
   }
 
@@ -1118,8 +1130,8 @@ class GuildApp {
     let headerRowIdx = -1;
     let colMap = { name: -1, leadership: -1, hp: -1, atk: -1, def: -1, pursuit: -1 };
 
-    // 掃描前 10 行尋找表頭行
-    for (let r = 0; r < Math.min(10, rows.length); r++) {
+    // 掃描前 15 行尋找表頭行
+    for (let r = 0; r < Math.min(15, rows.length); r++) {
       const row = rows[r];
       if (!Array.isArray(row)) continue;
 
@@ -1129,37 +1141,63 @@ class GuildApp {
       row.forEach((cell, colIdx) => {
         const text = String(cell || '').trim();
         if (!text) return;
-        const clean = text.replace(/[\s\(\)（）_]/g, '');
+        const clean = text.replace(/[\s\(\)（）_\[\]【】]/g, '').toUpperCase();
 
-        // 暱稱欄位
-        if (tempMap.name === -1 && /^(遊戲暱稱|暱稱|成員|玩家|名字|名稱|姓名|Name|ID|帳號|會員)$/i.test(clean)) {
-          tempMap.name = colIdx;
-          foundMatches++;
+        // 排除明顯是序號/排名的欄位
+        const isIndexCol = /^(序號|編號|NO|NUM|INDEX|RANK|排名|名次)$/i.test(clean);
+
+        // 暱稱欄位 (更加寬鬆，匹配遊戲暱稱、成員名、玩家、姓名、ID 等)
+        if (!isIndexCol && tempMap.name === -1) {
+          if (/^(遊戲暱稱|暱稱|成員|玩家|名字|名稱|姓名|NAME|ID|帳號|會員|蝸牛|角色|隊員|成員名|玩家暱稱|遊戲名)$/i.test(clean) ||
+              (clean.includes('暱稱') || clean.includes('成員') || clean.includes('玩家')) && !clean.includes('戰力') && !clean.includes('率')) {
+            tempMap.name = colIdx;
+            foundMatches++;
+          }
         }
+
         // 領導力欄位
-        else if (tempMap.leadership === -1 && /^(領導力|領導|統帥|統率|領|Leadership|Leader|Lead)$/i.test(clean)) {
-          tempMap.leadership = colIdx;
-          foundMatches++;
+        if (tempMap.leadership === -1) {
+          if (/^(領導力|領導|統帥|統率|領|LEADERSHIP|LEADER|LEAD|軍隊)$/i.test(clean) ||
+              (clean.includes('領導') || clean.includes('統帥') || clean.includes('統率'))) {
+            tempMap.leadership = colIdx;
+            foundMatches++;
+          }
         }
+
         // 血量欄位
-        else if (tempMap.hp === -1 && /^(血量|生命|HP|血量K|生命K|HPK|生命值|血|生命力)$/i.test(clean)) {
-          tempMap.hp = colIdx;
-          foundMatches++;
+        if (tempMap.hp === -1) {
+          if (/^(血量|生命|HP|血量K|生命K|HPK|生命值|血|生命力|HEALTH)$/i.test(clean) ||
+              (clean.includes('血量') || clean.includes('生命') || clean.includes('HP'))) {
+            tempMap.hp = colIdx;
+            foundMatches++;
+          }
         }
+
         // 攻擊欄位
-        else if (tempMap.atk === -1 && /^(攻擊|物攻|ATK|攻擊K|物攻K|ATKK|攻擊力|攻)$/i.test(clean)) {
-          tempMap.atk = colIdx;
-          foundMatches++;
+        if (tempMap.atk === -1) {
+          if (/^(攻擊|物攻|ATK|攻擊K|物攻K|ATKK|攻擊力|攻|ATTACK)$/i.test(clean) ||
+              (clean.includes('攻擊') || clean.includes('物攻') || clean === '攻' || clean.includes('ATK'))) {
+            tempMap.atk = colIdx;
+            foundMatches++;
+          }
         }
+
         // 防禦欄位
-        else if (tempMap.def === -1 && /^(防禦|防御|物防|DEF|防禦K|防御K|物防K|DEFK|防禦力|防)$/i.test(clean)) {
-          tempMap.def = colIdx;
-          foundMatches++;
+        if (tempMap.def === -1) {
+          if (/^(防禦|防御|物防|DEF|防禦K|防御K|物防K|DEFK|防禦力|防|DEFENSE)$/i.test(clean) ||
+              (clean.includes('防禦') || clean.includes('防御') || clean.includes('物防') || clean === '防' || clean.includes('DEF'))) {
+            tempMap.def = colIdx;
+            foundMatches++;
+          }
         }
+
         // 追擊欄位
-        else if (tempMap.pursuit === -1 && /^(追擊|追击|SPD|Pursuit|追擊K|追击K|SPDK|追擊力|追)$/i.test(clean)) {
-          tempMap.pursuit = colIdx;
-          foundMatches++;
+        if (tempMap.pursuit === -1) {
+          if (/^(追擊|追击|SPD|PURSUIT|追擊K|追击K|SPDK|追擊力|追|SPEED)$/i.test(clean) ||
+              (clean.includes('追擊') || clean.includes('追击') || clean === '追' || clean.includes('SPD') || clean.includes('PURSUIT'))) {
+            tempMap.pursuit = colIdx;
+            foundMatches++;
+          }
         }
       });
 
@@ -1171,9 +1209,28 @@ class GuildApp {
       }
     }
 
-    // 若未識別到表頭，採預設索引對應 [0: 暱稱, 1: 領導, 2: 血量, 3: 攻擊, 4: 防禦, 5: 追擊]
+    // 若未識別到表頭（無表頭的純數據文件）
     if (headerRowIdx === -1) {
-      colMap = { name: 0, leadership: 1, hp: 2, atk: 3, def: 4, pursuit: 5 };
+      // 檢查第一筆有效資料的第一欄是否為純數字序號 (例如 1, 2, 3...)
+      const firstValidRow = rows.find(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
+      if (firstValidRow) {
+        const firstCell = String(firstValidRow[0] || '').trim();
+        const secondCell = String(firstValidRow[1] || '').trim();
+        const isFirstCellNumber = /^\d+$/.test(firstCell) && parseInt(firstCell, 10) <= 200;
+        const isSecondCellText = secondCell && isNaN(Number(secondCell));
+
+        if (isFirstCellNumber && isSecondCellText) {
+          // 第 0 欄是序號，第 1 欄是暱稱
+          colMap = { name: 1, leadership: 2, hp: 3, atk: 4, def: 5, pursuit: 6 };
+          headerRowIdx = -1;
+        } else {
+          // 第 0 欄直接是暱稱
+          colMap = { name: 0, leadership: 1, hp: 2, atk: 3, def: 4, pursuit: 5 };
+          headerRowIdx = -1;
+        }
+      } else {
+        colMap = { name: 0, leadership: 1, hp: 2, atk: 3, def: 4, pursuit: 5 };
+      }
     }
 
     const members = [];
@@ -1187,7 +1244,7 @@ class GuildApp {
       if (!rawName || rawName === 'undefined' || rawName === 'null') continue;
 
       // 排除總計/合計/說明等非成員行
-      if (/^(合計|總計|平均|總和|備註|說明|統計|總計數|Average|Total)$/i.test(rawName)) continue;
+      if (/^(合計|總計|平均|總和|備註|說明|統計|總計數|AVERAGE|TOTAL)$/i.test(rawName)) continue;
 
       // 提取數值
       let leadership = colMap.leadership !== -1 ? this.parseExcelStatNumber(row[colMap.leadership]) : 0;
@@ -1202,8 +1259,8 @@ class GuildApp {
         leadership = parseInt(parts[0], 10) || leadership;
       }
 
-      // 名字清洗（若包含開頭前綴符號）
-      let cleanName = rawName.replace(/^[+＋\-_#@\s]+/, '').trim();
+      // 名字清洗（若包含開頭前綴符號或引號）
+      let cleanName = rawName.replace(/^["'“”‘’+＋\-_#@\s]+|["'“”‘’\s]+$/g, '').trim();
 
       const memberObj = {
         name: cleanName || rawName,
@@ -2804,12 +2861,16 @@ class GuildApp {
   }
 
   // 模態彈窗輔助函式
-  openOcrModal() {
-    const modal = document.getElementById('ocr-modal');
+  openModal(id) {
+    const modal = document.getElementById(id);
     if (modal) {
       modal.classList.remove('hidden');
       modal.style.display = 'flex';
     }
+  }
+
+  openOcrModal() {
+    this.openModal('ocr-modal');
   }
 
   openFormulaModal() {

@@ -505,6 +505,9 @@ class GuildApp {
 
         if (res && res.success && res.members && res.members.length > 0) {
           for (let m of res.members) {
+            if (window.guildOcr && typeof window.guildOcr.cleanPlayerName === 'function') {
+              m.name = window.guildOcr.cleanPlayerName(m.name || '');
+            }
             const calculated = this.calculateMetrics(m);
             calculated.imageUrl = res.imageUrl || ''; // 伺服器持久化路徑 (/uploads/...)
             calculated.sourceImage = base64; // 暫存 Base64 供當前視窗即時檢視

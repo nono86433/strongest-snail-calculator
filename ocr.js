@@ -423,13 +423,62 @@ class GuildOcrProcessor {
   }
 
   /**
-   * 清理玩家名稱
+   * 判定文字是否為遊戲系統資料、氣泡、戰鬥判定等非玩家名稱雜訊
+   */
+  isGameSystemNoise(text) {
+    if (!text) return true;
+    const s = text.trim();
+    if (!s || s.length === 0) return true;
+
+    // 1. 聊天與求助氣泡、顏文字特徵 (包含 (~_~)、<(¯―¯)>、求幫助+1 等)
+    if (/求[幫帮]助|求助|求救|求支援|幫助\+?\d*|帮[忙助]|借兵|聊天|發言|發布/.test(s)) return true;
+    if (/[~¯_―^><*]{2,}/.test(s) || /^[<\(\[\{（【][^\w\u4e00-\u9fa5]+[>\)\]\}）】]/.test(s)) return true;
+
+    // 2. 敵軍資訊與戰鬥判定結果
+    if (/^(工兵|刀客|行政[專专][員员]|冰元素[學学]?[者者]?|力士|[專专][員员]|守衛|部隊|長老|護衛|巡邏)\d*$/i.test(s)) return true;
+    if (/工兵\d*|刀客\d*|行政[專专][員员]|冰元素|敵[軍部]|敌[军部]|軍實力|军实力|重實力/.test(s)) return true;
+    if (/^(失敗|失败|勝利|胜利|平手|打平|戰鬥結束|战斗结束)$/.test(s)) return true;
+
+    // 3. 戰力數值與系統單位
+    if (/^[0-9.]+\s*[MmKkWwVvNn]$/i.test(s)) return true; // 例如 104M 總戰力氣泡
+    if (/戰力|战力|次數|次数/.test(s)) return true;
+
+    // 4. 遊戲系統按鈕與 UI 標籤
+    if (/一[鍵键]上[陣阵]|一[鍵键]下[陣阵]|上[陣阵]|下[陣阵]|兵種|兵种|演練|演练|公會|公会|俱樂部|俱乐部/.test(s)) return true;
+    if (/^(生命|血量|攻擊|攻击|防禦|防御|追擊|追击|領導力|领导力)$/.test(s)) return true;
+    if (/^(微調|校對|名冊|確認|取消|對照|截圖)$/.test(s)) return true;
+
+    return false;
+  }
+
+  /**
+   * 清理玩家名稱（精準過濾系統資料、符號前綴與顏文字）
    */
   cleanPlayerName(text) {
     if (!text) return '';
-    // 去除雜訊字元，保留中英數字
     let cleaned = text.replace(/[\n\r\t]/g, '').trim();
+
+    // 先剔除開頭的標註符號（如 +978 -> 978, #小明 -> 小明）
+    cleaned = cleaned.replace(/^[+＋\-_#@\s]+/, '').trim();
+
+    // 檢查是否為遊戲系統詞或雜訊氣泡
+    if (this.isGameSystemNoise(cleaned)) {
+      return '';
+    }
+
+    // 去除首尾非中英數字符號
     cleaned = cleaned.replace(/^[^a-zA-Z0-9\u4e00-\u9fa5]+|[^a-zA-Z0-9\u4e00-\u9fa5]+$/g, '');
+
+    // 再次檢查
+    if (this.isGameSystemNoise(cleaned)) {
+      return '';
+    }
+
+    // 長度防呆：若純數字且小於2位數排除
+    if (/^\d+$/.test(cleaned) && cleaned.length < 2) {
+      return '';
+    }
+
     return cleaned;
   }
 
@@ -480,23 +529,34 @@ class GuildOcrProcessor {
     if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
 
     const prompt = isVerticalBattleScreen
-      ? `請精確解析這張最強蝸牛公會戰兵種上陣介面截圖：
-1. 找出玩家名稱（例如畫面標註的大字，如 Europa 或 命不語）。
-2. 找出進度條領導力數值（例如 3751/3751 或 3402/3402，取出整數 3751 或 3402）。
-3. 找出底部四圍屬性數值：生命/血量(藥丸)、攻擊(劍)、防禦(盾)、追擊(風)。
-注意：數值帶有 M（如 107M, 20.6M），請乘 1000 轉換為 (K) 單位整數（如 107000, 20600）！
-只輸出純 JSON 陣列，只包含這 1 位玩家：
+      ? `你是一位《最強蝸牛》手遊公會戰報數據解析專家。請精確解析這張「兵種演練上陣介面」截圖：
+
+【核心規則：玩家名稱識別與嚴格防呆】
+1. 真正的玩家名稱：通常由公會長或玩家手動打字標註在「中間兵種棋盤格子區域」（例如大字標註 978、Europa、命不語 等）。若標註開頭有 + 或 # 等符號（如 +978、#978），請去除符號取其核心名字（如 978）。
+2. 嚴格禁止抓取遊戲系統資料作為玩家名稱：
+   - 絕對禁止抓取左上角/右上角的俱樂部求助或聊天氣泡（如「求幫助+1」、「求幫助」、「求助」、「求救」、顏文字如 (~_~) 等）！
+   - 絕對禁止抓取右上角小電視內的敵軍資訊與戰鬥判定（如「工兵8005」、「刀客」、「失敗」、「勝利」、「平手」、「敵軍戰力」等）！
+   - 絕對禁止抓取角色頭頂總戰力氣泡（如「104M」等）！
+   - 絕對禁止抓取兵種格子角標小數字（如兵階 4、數量 362 等）！
+   - 若畫面中央棋盤確實沒有任何玩家手動標註文字，name 請填空字串 ""，絕對不能拿任何系統文字或敵軍文字充數！
+
+【數值提取規則】
+1. 領導力：位於底部進度條（如 4251/4251 或 3751/3751，取出左側整數 4251 或 3751）。
+2. 四圍屬性：位於兵種棋盤正下方一排四個數值：生命/血量(藥丸)、攻擊(劍)、防禦(盾)、追擊(風)。
+   帶有 M（如 167M, 30.5M, 27.2M, 28.2M）請乘以 1000 轉為 (K) 整數（如 167000, 30500, 27200, 28200）。
+
+請只輸出純 JSON 陣列，只包含這 1 位玩家：
 [
   {
-    "name": "玩家名稱",
-    "leadership": 3751,
-    "hp": 107000,
-    "atk": 20600,
-    "def": 19200,
-    "pursuit": 21300
+    "name": "玩家名稱或代號",
+    "leadership": 4251,
+    "hp": 167000,
+    "atk": 30500,
+    "def": 27200,
+    "pursuit": 28200
   }
 ]`
-      : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列，每筆包含 name, leadership, hp, atk, def, pursuit（數值單位 K）。`;
+      : `請解析這張最強蝸牛公會表格截圖，輸出抓取到的成員 JSON 陣列，每筆包含 name, leadership, hp, atk, def, pursuit（數值單位 K）。注意玩家名稱必須是真實玩家暱稱，嚴格排除表頭、遊戲系統詞或戰鬥結果詞。`;
 
     // 極速模型陣列：優先使用極速響應型 (1秒出圖)，後備高精度型
     const models = ['gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-flash-latest'];
@@ -596,8 +656,10 @@ class GuildOcrProcessor {
           if (def > 1000000) def = Math.round(def / 1000);
           if (pursuit > 1000000) pursuit = Math.round(pursuit / 1000);
 
+          let cleanName = this.cleanPlayerName(m.name || '');
+
           return {
-            name: (m.name || '').trim(),
+            name: cleanName,
             leadership: Math.round(Number(m.leadership) || 0),
             hp, atk, def, pursuit
           };

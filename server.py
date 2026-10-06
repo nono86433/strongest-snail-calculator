@@ -278,34 +278,45 @@ def analyze_image_dynamic(img):
     name = ''
     name_item = None
     if (w / h) < 1.35:
-        enemy_patterns = [
-            r'刀客\d*', r'行政[專专][員员]\d*', r'冰元素[學学][者者]\d*', r'力士\d*', r'[專专][員员]\d*',
-            r'敵軍', r'敌军', r'軍實力', r'军实力', r'重實力', r'實力', r'实力',
-            r'失敗', r'失败', r'勝利', r'胜利', r'平手', r'次數', r'次数',
+        system_noise_patterns = [
+            # 聊天與求助氣泡、顏文字特徵
+            r'求[幫帮]助', r'求助', r'求救', r'求支援', r'幫助\+?\d*', r'帮[忙助]', r'借兵', r'聊天',
+            r'[~¯_―^><*]{2,}', r'^[<\(\[\{（【][^\w\u4e00-\u9fa5]+[>\)\]\}）】]',
+            # 敵軍資訊與戰鬥判定結果
+            r'工兵\d*', r'刀客\d*', r'行政[專专][員员]\d*', r'冰元素[學学]?[者者]?\d*', r'力士\d*', r'[專专][員员]\d*',
+            r'守衛\d*', r'部隊\d*', r'長老\d*', r'護衛\d*', r'巡邏\d*',
+            r'敵[軍部]', r'敌[军部]', r'軍實力', r'军实力', r'重實力', r'實力', r'实力',
+            r'失敗', r'失败', r'勝利', r'胜利', r'平手', r'打平', r'次數', r'次数',
+            # 系統功能按鈕與 UI 標籤
             r'一[鍵键]上[陣阵]', r'一[鍵键]下[陣阵]', r'上[陣阵]', r'下[陣阵]',
+            r'兵種', r'兵种', r'演練', r'演练', r'公會', r'公会', r'俱樂部', r'俱乐部',
             r'保全', r'劍仙', r'剑仙', r'對照', r'对照', r'上下', r'捲動', r'卷动',
             r'截圖', r'截图', r'抓取', r'會員', r'会员', r'成功', r'提示',
             r'校對', r'校对', r'微調', r'微调', r'清單', r'清单', r'衍生',
             r'計算', r'计算', r'取消', r'確定', r'确定', r'名冊', r'名册',
-            r'追加', r'覆蓋', r'覆盖', r'戰力', r'战力'
+            r'追加', r'覆蓋', r'覆盖', r'戰力', r'战力',
+            r'生命', r'血量', r'攻擊', r'防御', r'防禦', r'追擊'
         ]
         name_candidates = []
         for it in all_name_items:
-            # 排除最底部導航系統按鈕區域
-            if it['cy'] > h * 0.95:
+            # 限制玩家名稱僅在中央棋盤格區域搜尋 (Y: 25% ~ 85%)，徹底排除頂部求助聊天氣泡/敵軍面板與底部數值列
+            if it['cy'] < h * 0.25 or it['cy'] > h * 0.85:
                 continue
 
             t = it['text'].strip()
-            # 排除黑名單系統詞、敵軍稱號與戰鬥結果詞
-            if any(re.search(pat, t) for pat in enemy_patterns):
+            # 排除黑名單系統詞、敵軍稱號、聊天求助與戰鬥結果詞
+            if any(re.search(pat, t) for pat in system_noise_patterns):
                 continue
             # 排除帶有屬性單位 (M, K) 或斜線數值
             if re.search(r'[0-9.]+\s*[MmKk]', t) or '/' in t or '\\' in t:
                 continue
-            # 清理開頭的符號 (例如 +978 -> 978)
+            # 清理開頭的符號 (例如 +978 -> 978, #阿偉 -> 阿偉)
             cleaned = re.sub(r'^[+＋\-_#@\s]+', '', t)
             cleaned = re.sub(r'[^\w\u4e00-\u9fa5]', '', cleaned)
             if len(cleaned) < 2:
+                continue
+            # 再次過濾清理後的字串
+            if any(re.search(pat, cleaned) for pat in system_noise_patterns):
                 continue
             # 純數字暱稱 (如 978, 12742) 至少需 3 位數，且需具備字體大小，排除兵種格角標與關卡層數小數字
             if cleaned.isdigit():

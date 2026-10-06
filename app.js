@@ -44,6 +44,9 @@ class GuildApp {
     this.currentVerifyIndex = 0; // 當前在「成員截圖核對與資料校正」視窗中的成員索引
     this.currentVerifyMember = null;
 
+    this.onlyStagnantFilter = false; // 是否僅篩選顯示超過 8 週未更新的成員
+    this.stagnantThreshold = 8;     // 數據無變化之提醒週數門檻 (8 週)
+
     this.init();
   }
 
@@ -1036,9 +1039,11 @@ class GuildApp {
 
     const exportRows = this.getSortedAndFilteredMembers().map((m, idx) => {
       const weekDiff = this.getMemberWeeklyPowerDiff(m);
+      const stagInfo = this.getMemberStagnantInfo(m);
       return {
         "序號": idx + 1,
         "週戰力增減": weekDiff.isNew ? "NEW" : (weekDiff.diff > 0 ? `+${weekDiff.diff}` : `${weekDiff.diff}`),
+        "更新狀態": stagInfo.isStagnant ? `⚠️ 停滯 ${stagInfo.stagnantWeeks} 週` : (stagInfo.stagnantWeeks > 0 ? `持平 ${stagInfo.stagnantWeeks} 週` : (weekDiff.isNew ? "NEW" : "已更新")),
         "遊戲暱稱": m.name,
         "領導力": m.leadership,
         "血量(K)": m.hp,
@@ -1534,6 +1539,62 @@ class GuildApp {
   }
 
   /**
+   * 計算成員數據連續未變更/持平週數 (超過 8 週自動警示提醒更新)
+   */
+  getMemberStagnantInfo(m) {
+    if (!m || !m.name) return { stagnantWeeks: 0, isStagnant: false, label: '正常', lastChangedWeek: this.currentWeek };
+
+    // 若成員物件已明確手動指定停滯週數，以此優先
+    if (typeof m.stagnantWeeks === 'number' && m.stagnantWeeks > 0) {
+      const sw = m.stagnantWeeks;
+      const isStag = sw >= (this.stagnantThreshold || 8);
+      return {
+        stagnantWeeks: sw,
+        isStagnant: isStag,
+        label: isStag ? `⚠️ 停滯 ${sw} 週` : `持平 ${sw} 週`,
+        lastChangedWeek: Math.max(1, this.currentWeek - sw)
+      };
+    }
+
+    // 自動依歷史週次由近至遠回溯檢查
+    const curWeek = this.currentWeek;
+    const curPower = Number(m.calc_total) || 0;
+    let count = 0;
+
+    for (let w = curWeek - 1; w >= 1; w--) {
+      const weekList = this.weeksData[w] || [];
+      const pastM = weekList.find(p => (p.name || '').trim().toLowerCase() === (m.name || '').trim().toLowerCase());
+      if (!pastM) {
+        // 該歷史週次中無此人，連續記錄中斷
+        break;
+      }
+      const pastPower = Number(pastM.calc_total) || 0;
+      // 戰力總值與四圍屬性皆持平
+      const isPowerEqual = Math.abs(curPower - pastPower) < 0.1;
+      const isStatsEqual = Number(pastM.hp) === Number(m.hp) && 
+                           Number(pastM.atk) === Number(m.atk) && 
+                           Number(pastM.def) === Number(m.def) && 
+                           Number(pastM.pursuit) === Number(m.pursuit);
+
+      if (isPowerEqual && isStatsEqual) {
+        count++;
+      } else {
+        // 數據發生變化，中斷連續持平
+        break;
+      }
+    }
+
+    const threshold = this.stagnantThreshold || 8;
+    const isStagnant = count >= threshold;
+    return {
+      stagnantWeeks: count,
+      isStagnant,
+      label: isStagnant ? `⚠️ 停滯 ${count} 週` : (count > 0 ? `持平 ${count} 週` : '本週已更'),
+      lastChangedWeek: Math.max(1, curWeek - count)
+    };
+  }
+
+  /**
    * 取得過濾與排序後的成員
    */
   getSortedAndFilteredMembers() {
@@ -1544,6 +1605,11 @@ class GuildApp {
       list = list.filter(m => (m.name || '').toLowerCase().includes(this.searchQuery));
     }
 
+    // 僅看超過 8 週未更新過濾
+    if (this.onlyStagnantFilter) {
+      list = list.filter(m => this.getMemberStagnantInfo(m).isStagnant);
+    }
+
     // 欄位排序
     list.sort((a, b) => {
       if (this.sortColumn === 'power_change') {
@@ -1552,6 +1618,12 @@ class GuildApp {
         const valA = diffA.isNew ? 99999999 : diffA.diff;
         const valB = diffB.isNew ? 99999999 : diffB.diff;
         return this.sortDirection === 'asc' ? valA - valB : valB - valA;
+      }
+
+      if (this.sortColumn === 'stagnant_weeks') {
+        const swA = this.getMemberStagnantInfo(a).stagnantWeeks;
+        const swB = this.getMemberStagnantInfo(b).stagnantWeeks;
+        return this.sortDirection === 'asc' ? swA - swB : swB - swA;
       }
 
       let valA = a[this.sortColumn];
@@ -1590,10 +1662,18 @@ class GuildApp {
     // 依使用者需求：本週戰力 MVP 顯示「總戰力第一名」
     const topMember = totalMembers > 0 ? [...this.members].sort((a,b) => (b.calc_total || 0) - (a.calc_total || 0))[0] : null;
 
+    // 計算超過 8 週未更新人數
+    const stagnantCount = this.members.filter(m => this.getMemberStagnantInfo(m).isStagnant).length;
+
     document.getElementById('stat-member-count').textContent = totalMembers;
     document.getElementById('stat-avg-score').textContent = avgScore;
     document.getElementById('stat-total-power').textContent = totalPower.toLocaleString();
     document.getElementById('stat-mvp').textContent = topMember ? topMember.name : '暫無';
+
+    const statStagEl = document.getElementById('stat-stagnant-count');
+    if (statStagEl) statStagEl.textContent = stagnantCount;
+    const filterStagEl = document.getElementById('filter-stagnant-count');
+    if (filterStagEl) filterStagEl.textContent = stagnantCount;
   }
 
   /**
@@ -1653,7 +1733,7 @@ class GuildApp {
 
     if (list.length === 0) {
       if (this.searchQuery) {
-        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-12 text-slate-400">找不到包含「${this.escapeHtml(this.searchQuery)}」的成員</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="text-center py-12 text-slate-400">找不到包含「${this.escapeHtml(this.searchQuery)}」的成員</td></tr>`;
         emptyState.classList.add('hidden');
         tableContainer.classList.remove('hidden');
       } else {
@@ -1669,6 +1749,7 @@ class GuildApp {
     tbody.innerHTML = list.map((m, idx) => {
       const pen = this.penalties.find(p => (p.name || '').trim().toLowerCase() === (m.name || '').trim().toLowerCase());
       const weekDiff = this.getMemberWeeklyPowerDiff(m);
+      const stagInfo = this.getMemberStagnantInfo(m);
 
       let diffHtml = '';
       if (weekDiff.isNew) {
@@ -1681,19 +1762,43 @@ class GuildApp {
         diffHtml = `<span class="text-slate-500 font-mono text-xs" title="戰力與上週持平">-</span>`;
       }
 
+      // 新增欄位：更新狀態 HTML (超過 8 週無變化亮黃警示)
+      let stagHtml = '';
+      if (stagInfo.isStagnant) {
+        stagHtml = `
+          <button onclick="app.copySingleMemberReminder('${this.escapeHtml(m.name)}', ${stagInfo.stagnantWeeks})" 
+            title="【警告】該成員數據已連續 ${stagInfo.stagnantWeeks} 週完全無變更！點擊複製個別催繳提醒" 
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-950 text-amber-300 border border-amber-600 ring-1 ring-amber-500/50 shadow-sm hover:scale-105 transition cursor-pointer">
+            <span>⚠️</span>
+            <span>停滯 ${stagInfo.stagnantWeeks} 週</span>
+          </button>
+        `;
+      } else if (stagInfo.stagnantWeeks > 0) {
+        stagHtml = `<span class="text-slate-400 font-mono text-xs" title="數據已連續持平 ${stagInfo.stagnantWeeks} 週">持平 ${stagInfo.stagnantWeeks} 週</span>`;
+      } else if (weekDiff.isNew) {
+        stagHtml = `<span class="text-cyan-400 font-mono text-xs font-bold">NEW</span>`;
+      } else {
+        stagHtml = `<span class="text-emerald-400 font-mono text-xs font-semibold" title="本週戰力有變更">✅ 已更新</span>`;
+      }
+
       const safeId = encodeURIComponent(m.id || '');
       const safeName = encodeURIComponent(m.name || '');
+      const rowHighlightClass = stagInfo.isStagnant ? 'bg-amber-950/15 border-amber-900/40' : 'border-slate-800';
 
       return `
-      <tr class="hover:bg-slate-800/60 transition-colors border-b border-slate-800">
+      <tr class="hover:bg-slate-800/60 transition-colors border-b ${rowHighlightClass}">
         <td class="text-center py-1.5">
           ${diffHtml}
+        </td>
+        <td class="text-center py-1.5">
+          ${stagHtml}
         </td>
         <td class="text-left font-medium text-white py-1.5">
           <div class="flex items-center space-x-1.5">
             <span class="text-xs text-slate-500 font-mono w-5 inline-block shrink-0">${idx + 1}</span>
             <span class="cursor-pointer hover:text-cyan-400 font-bold truncate max-w-[110px] flex items-center gap-1 group" title="點擊開啟截圖核對與資料校正：${this.escapeHtml(m.name)}" onclick="app.openMemberVerifyModal(${idx})">
               <span>${this.escapeHtml(m.name)}</span>
+              ${stagInfo.isStagnant ? '<span class="text-amber-400 text-xs shrink-0" title="超過 8 週數據無變化，需提醒更新">⚠️</span>' : ''}
               <span class="text-[10px] text-slate-500 group-hover:text-cyan-400">🔍</span>
             </span>
           </div>
@@ -2867,6 +2972,131 @@ class GuildApp {
       modal.classList.remove('hidden');
       modal.style.display = 'flex';
     }
+  }
+
+  /**
+   * 切換「僅顯示超過8週未更新成員」快捷篩選
+   */
+  toggleStagnantFilter() {
+    this.onlyStagnantFilter = !this.onlyStagnantFilter;
+    const btn = document.getElementById('btn-filter-stagnant');
+    if (btn) {
+      if (this.onlyStagnantFilter) {
+        btn.className = 'px-2.5 py-1.5 rounded-lg bg-amber-900/90 text-amber-200 border border-amber-500 text-xs font-bold flex items-center gap-1.5 transition shadow-sm ring-1 ring-amber-400/50';
+      } else {
+        btn.className = 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition';
+      }
+    }
+    this.renderTable();
+    if (this.onlyStagnantFilter) {
+      const count = this.members.filter(m => this.getMemberStagnantInfo(m).isStagnant).length;
+      this.showToast(`已過濾顯示：共 ${count} 位超過 8 週數據未更新成員`);
+    } else {
+      this.showToast('已取消過濾，顯示全體成員名單');
+    }
+  }
+
+  /**
+   * 開啟超過 8 週久未更新成員催繳彈窗
+   */
+  openStagnantModal() {
+    const stagnantList = this.members
+      .map(m => ({ member: m, info: this.getMemberStagnantInfo(m) }))
+      .filter(item => item.info.isStagnant)
+      .sort((a, b) => b.info.stagnantWeeks - a.info.stagnantWeeks);
+
+    const badgeEl = document.getElementById('stagnant-modal-badge');
+    const weekEl = document.getElementById('stagnant-modal-current-week');
+    const tbody = document.getElementById('stagnant-modal-tbody');
+
+    if (badgeEl) badgeEl.textContent = `共 ${stagnantList.length} 人`;
+    if (weekEl) weekEl.textContent = this.currentWeek;
+
+    if (tbody) {
+      if (stagnantList.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-12 text-center text-slate-400 space-y-2">
+              <span class="text-3xl block">🎉</span>
+              <p class="font-bold text-emerald-400 text-sm">全員戰力數據皆正常更新！</p>
+              <p class="text-xs text-slate-500">當前第 ${this.currentWeek} 週名單中，沒有任何超過 8 週數據完全未變更的成員。</p>
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = stagnantList.map((item, idx) => {
+          const m = item.member;
+          const info = item.info;
+          return `
+            <tr class="hover:bg-slate-800/60 border-b border-slate-800 transition">
+              <td class="p-2.5 text-center text-slate-500 font-mono">${idx + 1}</td>
+              <td class="p-2.5 text-left font-bold text-white flex items-center gap-1.5">
+                <span class="text-amber-400">⚠️</span>
+                <span>${this.escapeHtml(m.name)}</span>
+              </td>
+              <td class="p-2.5 text-right font-mono text-cyan-300 font-bold">${(m.calc_total || 0).toLocaleString()}</td>
+              <td class="p-2.5 text-center">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-600 font-mono">
+                  連續 ${info.stagnantWeeks} 週
+                </span>
+              </td>
+              <td class="p-2.5 text-center">
+                <button onclick="app.copySingleMemberReminder('${this.escapeHtml(m.name)}', ${info.stagnantWeeks})" 
+                  class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-slate-700 text-xs font-medium flex items-center gap-1 mx-auto transition" title="複製此成員的提醒文字">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                  複製提醒
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    this.openModal('stagnant-modal');
+  }
+
+  /**
+   * 複製單一成員催繳提醒文字
+   */
+  copySingleMemberReminder(name, weeks) {
+    const text = `【蝸牛之家 戰力更新提醒】🐌\n@${name} 您好！您在公會名冊中的戰力數據已連續 ${weeks} 週完全未更新。\n請於本週提交最新兵種演練截圖，以利公會長統計本週敢死隊名單，辛苦了！✨`;
+    navigator.clipboard.writeText(text).then(() => {
+      this.showToast(`已複製【${name}】的催繳提醒至剪貼簿！`);
+    }).catch(() => {
+      prompt('請手動複製提醒文字：', text);
+    });
+  }
+
+  /**
+   * 一鍵複製全體久未更新成員催繳公告
+   */
+  copyAllStagnantReport() {
+    const stagnantList = this.members
+      .map(m => ({ member: m, info: this.getMemberStagnantInfo(m) }))
+      .filter(item => item.info.isStagnant)
+      .sort((a, b) => b.info.stagnantWeeks - a.info.stagnantWeeks);
+
+    if (stagnantList.length === 0) {
+      alert('目前沒有超過 8 週未更新的成員！');
+      return;
+    }
+
+    let text = `📢【蝸牛之家 公會戰力久未更新催繳名單】📢\n`;
+    text += `📅 當前週次：第 ${this.currentWeek} 週\n`;
+    text += `⚠️ 久未更新人數：共 ${stagnantList.length} 人 (超過 8 週無數據變更)\n`;
+    text += `────────────────────\n`;
+    stagnantList.forEach((item, idx) => {
+      text += `${idx + 1}. 【${item.member.name}】（連續停滯 ${item.info.stagnantWeeks} 週，目前戰力：${(item.member.calc_total || 0).toLocaleString()}）\n`;
+    });
+    text += `────────────────────\n`;
+    text += `💡 以上隊員請盡速於群組或系統上傳最新演練截圖進行更新，以免影響敢死隊員選拔與週戰分配！感謝大家配合！🐌💪`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      this.showToast('久未更新催繳公告已成功複製到剪貼簿！');
+    }).catch(() => {
+      prompt('請手動複製公告：', text);
+    });
   }
 
   openOcrModal() {

@@ -47,6 +47,17 @@ class GuildApp {
     this.onlyStagnantFilter = false; // 是否僅篩選顯示超過 8 週未更新的成員
     this.stagnantThreshold = 8;     // 數據無變化之提醒週數門檻 (8 週)
 
+    // 物種懶人包初始化
+    this.currentSpeciesKey = 'beetle'; // 當前選中之物種週 ('beetle' | 'goldfish' | 'clam' | 'hamster' | 'mantis')
+    this.speciesConfig = {
+      beetle: { name: '蜣螂週', icon: '🪲', badge: '第 1 週物種' },
+      goldfish: { name: '金魚週', icon: '🐠', badge: '第 2 週物種' },
+      clam: { name: '北極貝週', icon: '🐚', badge: '第 3 週物種' },
+      hamster: { name: '倉鼠週', icon: '🐹', badge: '第 4 週物種' },
+      mantis: { name: '螳螂週', icon: '🦗', badge: '第 5 週物種' }
+    };
+    this.speciesAnnouncements = this.loadSpeciesAnnouncements();
+
     this.init();
   }
 
@@ -2164,11 +2175,11 @@ class GuildApp {
   }
 
   /**
-   * 切換分頁（公會成員總表 / 敢死隊員名單 / 懲罰名單）
+   * 切換分頁（公會成員總表 / 敢死隊員名單 / 懲罰名單 / 物種懶人包）
    */
   switchTab(tabName) {
     this.currentTab = tabName;
-    const tabs = ['main', 'vanguard', 'penalty'];
+    const tabs = ['main', 'vanguard', 'penalty', 'species'];
     tabs.forEach(t => {
       const btn = document.getElementById(`tab-btn-${t}`);
       const view = document.getElementById(`view-${t}`);
@@ -2181,6 +2192,8 @@ class GuildApp {
             btn.className = 'tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 bg-amber-950 text-amber-300 border border-amber-800 shadow-sm';
           } else if (t === 'penalty') {
             btn.className = 'tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 bg-rose-950 text-rose-300 border border-rose-800 shadow-sm';
+          } else if (t === 'species') {
+            btn.className = 'tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 bg-emerald-950 text-emerald-300 border border-emerald-800 shadow-sm';
           }
         } else {
           view.classList.add('hidden');
@@ -2198,6 +2211,8 @@ class GuildApp {
       if (pDate && !pDate.value) {
         pDate.value = new Date().toISOString().split('T')[0];
       }
+    } else if (tabName === 'species') {
+      this.renderSpeciesTab();
     }
   }
 
@@ -2810,6 +2825,361 @@ class GuildApp {
       const names = [...new Set(this.members.map(m => m.name).filter(Boolean))];
       datalist.innerHTML = names.map(n => `<option value="${this.escapeHtml(n)}">`).join('');
     }
+  }
+
+  /* ============================================================
+   * 物種懶人包模組 (五大物種週公告自訂編輯、即時預覽與一鍵複製)
+   * ============================================================ */
+
+  /**
+   * 取得五大物種週標準預設懶人包範本
+   */
+  getDefaultSpeciesAnnouncements() {
+    return {
+      beetle: {
+        title: '【蝸牛之家】🪲 蜣螂週物種戰作戰指令與重點懶人包',
+        content: `【本週物種】🪲 蜣螂（地下防空洞）
+【活動時間】本週五 05:00 ～ 下週一 04:59
+
+【核心克制與兵種推薦】
+1. 兵種克制：優先配置【異種】兵種，針對毒抗與甲殼有增傷優勢
+2. 屬性重點：蜣螂具備高防毒與腐蝕酸液，前排部隊務必注意防禦續航
+3. 敢死隊成員：請統一演練最強【異種】輸出陣型，確保第一梯次爆發
+
+【採集與挖礦分配】
+• 1～10 號隊員：優先清理毒氣防空洞與前線障礙物
+• 11～30 號隊員：專注挖掘物種寶箱、黏土礦脈與科技晶片
+• 候補隊員：隨時替補採集點，並清理外圍殘存毒蟲
+
+【打王與任務注意事項】
+• 每日免費鑽地次數請務必打滿，勿浪費體力
+• 週六晚間 20:00 統一開打公會王，請聽語音與指令不要提早開打
+• 遇到求助氣泡請全體成員互相點擊加速，互利共贏
+
+🐌 蝸牛之家全員齊心協力，本週全力衝刺！🪲💪`
+      },
+      goldfish: {
+        title: '【蝸牛之家】🐠 金魚週物種戰作戰指令與重點懶人包',
+        content: `【本週物種】🐠 金魚（水族霸主）
+【活動時間】本週五 05:00 ～ 下週一 04:59
+
+【核心克制與兵種推薦】
+1. 兵種克制：優先配置【活屍】兵種，針對水系生命體有額外壓制
+2. 屬性重點：金魚王生命極厚且帶有水流護盾，需依靠高攻擊與破甲貫穿
+3. 敢死隊成員：以活屍為主力、副選巨龍，維持穩定破盾輸出
+
+【採集與挖礦分配】
+• 珍珠貝採集點優先佔領，珍珠為本週兌換核心物資的重要資源
+• 遇到暴風雨水域請指派高追擊成員前往探測與開採
+• 每日記得定時領取魚餌與水下探測設備，加速地圖推進
+
+【打王與任務注意事項】
+• 週日 21:00 前全員需完成個人物種戰備任務 20 次
+• 敢死隊 30 人打王時務必注意技能配合與輪替順序
+• 未能準時出席跨服戰者請提前向幹部報備請假
+
+🐌 水族爭霸，蝸牛必勝！大家衝刺第一名！🌊💪`
+      },
+      clam: {
+        title: '【蝸牛之家】🐚 北極貝週物種戰作戰指令與重點懶人包',
+        content: `【本週物種】🐚 北極貝（極地甲殼）
+【活動時間】本週五 05:00 ～ 下週一 04:59
+
+【核心克制與兵種推薦】
+1. 兵種克制：優先配置【機械 / 天使】兵種，以高穿甲貫穿厚重冰殼
+2. 屬性重點：極地冰甲具有高防禦與反震傷害，需靠破甲與真實傷害
+3. 敢死隊成員：機械兵種優先，確保單回合貫穿破甲傷害達標
+
+【採集與挖礦分配】
+• 冰川礦坑深度較深，請隊員攜帶足夠鎬頭與破冰防寒裝備
+• 冰晶核心採集點為公會科技關鍵，各組隊長指派專人採滿
+• 嚴禁在未標記之深層冰裂縫單獨冒進，避免部隊凍傷減員
+
+【打王與任務注意事項】
+• 王具備冰凍控制，開打前請檢查耐寒抗性與符文搭配
+• 週六 20:30 全體集合破除冰壁防禦陣，聽指令集火打王
+• 戰力達標成員請於週日前更新最新戰力數據以利統計
+
+🐌 破冰前行，勇奪佳績！北極貝週全員衝鋒！❄️💪`
+      },
+      hamster: {
+        title: '【蝸牛之家】🐹 倉鼠週物種戰作戰指令與重點懶人包',
+        content: `【本週物種】🐹 倉鼠（地道糧倉）
+【活動時間】本週五 05:00 ～ 下週一 04:59
+
+【核心克制與兵種推薦】
+1. 兵種克制：優先配置【惡魔】兵種，針對敏捷速度型對手有壓制優勢
+2. 屬性重點：倉鼠閃避率與追擊極高，命中率、暴擊與追擊屬性為首選
+3. 敢死隊成員：以惡魔 + 異種混編，提高命中與暴擊率
+
+【採集與挖礦分配】
+• 本週核心在於【糧倉爭奪】，所有穀物儲備點必須佔好佔滿
+• 倉鼠地道交錯複雜，注意清理伏兵，避免採集部隊受阻
+• 每日定時收割葵花籽與堅果物資，運回公會大本營
+
+【打王與任務注意事項】
+• 倉鼠王會偷取資源，擊殺速度越快公會損失越少
+• 週五開局即刻壓制周邊地洞，週六全力攻打主巢
+• 敢死隊員請確認陣容演練已儲存至最新版本
+
+🐌 搶空糧倉，打爆倉鼠！公會夥伴們衝呀！🌰💪`
+      },
+      mantis: {
+        title: '【蝸牛之家】🦗 螳螂週物種戰作戰指令與重點懶人包',
+        content: `【本週物種】🦗 螳螂（密林刀客）
+【活動時間】本週五 05:00 ～ 下週一 04:59
+
+【核心克制與兵種推薦】
+1. 兵種克制：優先配置【天使 / 巨龍】兵種，能有效抵擋連斬傷害
+2. 屬性重點：螳螂攻擊力超高且具備先手連斬，前排防禦與回血必不可少
+3. 敢死隊成員：巨龍兵種為主，天使為輔，以高防高均分承受第一波爆發
+
+【採集與挖礦分配】
+• 叢林隱蔽點眾多，採集隊伍務必結伴，防止被落單刀客偷襲
+• 露水與枯葉標本採集請交由高機動性成員完成
+• 優先攻佔密林制高點以取得視野優勢
+
+【打王與任務注意事項】
+• 螳螂刀王具備斬殺機制，殘血隊員請先由後方替補接手
+• 週六 20:00 準時吹響集結號角，敢死隊第一波衝鋒
+• 全員記得打卡簽到，領取物種戰每週分紅
+
+🐌 刀刃無情，蝸牛有心！螳螂週全員出擊！⚔️💪`
+      }
+    };
+  }
+
+  /**
+   * 載入儲存的物種懶人包資料 (若無則載入預設範本)
+   */
+  loadSpeciesAnnouncements() {
+    const defaults = this.getDefaultSpeciesAnnouncements();
+    try {
+      const saved = localStorage.getItem('guild_species_announcements');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...defaults, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.warn('載入物種懶人包失敗，使用預設值:', e);
+    }
+    return defaults;
+  }
+
+  /**
+   * 儲存物種懶人包資料至本地與伺服器
+   */
+  saveSpeciesAnnouncements() {
+    try {
+      localStorage.setItem('guild_species_announcements', JSON.stringify(this.speciesAnnouncements));
+      const statusEl = document.getElementById('species-save-status');
+      if (statusEl) {
+        statusEl.textContent = '● 已自動儲存';
+        statusEl.className = 'text-emerald-400 font-mono';
+      }
+      this.saveToStorage();
+    } catch (e) {
+      console.error('儲存物種懶人包失敗:', e);
+    }
+  }
+
+  /**
+   * 渲染物種懶人包分頁內容
+   */
+  renderSpeciesTab() {
+    const key = this.currentSpeciesKey || 'beetle';
+    const cfg = this.speciesConfig[key] || this.speciesConfig.beetle;
+    const currentData = this.speciesAnnouncements[key] || { title: '', content: '' };
+
+    // 1. 更新各子分頁按鈕高亮
+    const keys = ['beetle', 'goldfish', 'clam', 'hamster', 'mantis'];
+    keys.forEach(k => {
+      const btn = document.getElementById(`species-tab-btn-${k}`);
+      if (btn) {
+        if (k === key) {
+          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-950 text-emerald-300 border border-emerald-600 shadow-md ring-1 ring-emerald-500/50';
+        } else {
+          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent';
+        }
+      }
+    });
+
+    // 2. 更新頂部卡片標題與圖標
+    const iconEl = document.getElementById('species-badge-icon');
+    const titleCardEl = document.getElementById('species-card-title');
+    const badgeEl = document.getElementById('species-current-badge');
+    if (iconEl) iconEl.textContent = cfg.icon;
+    if (titleCardEl) titleCardEl.innerHTML = `<span>${cfg.name} - 公告自訂編輯區</span>`;
+    if (badgeEl) badgeEl.textContent = cfg.badge;
+
+    // 3. 填充輸入欄位
+    const inputTitle = document.getElementById('species-input-title');
+    const inputContent = document.getElementById('species-input-content');
+    if (inputTitle) inputTitle.value = currentData.title || '';
+    if (inputContent) inputContent.value = currentData.content || '';
+
+    // 4. 即時更新社群預覽框
+    this.updateSpeciesLivePreview();
+  }
+
+  /**
+   * 切換物種子分頁 (蜣螂、金魚、北極貝、倉鼠、螳螂)
+   */
+  switchSpeciesSubTab(subTabKey) {
+    if (!this.speciesConfig[subTabKey]) return;
+
+    // 先儲存目前分頁的輸入內容
+    const curKey = this.currentSpeciesKey;
+    const inputTitle = document.getElementById('species-input-title');
+    const inputContent = document.getElementById('species-input-content');
+    if (inputTitle && inputContent && this.speciesAnnouncements[curKey]) {
+      this.speciesAnnouncements[curKey].title = inputTitle.value;
+      this.speciesAnnouncements[curKey].content = inputContent.value;
+      this.saveSpeciesAnnouncements();
+    }
+
+    this.currentSpeciesKey = subTabKey;
+    this.renderSpeciesTab();
+  }
+
+  /**
+   * 處理輸入事件：即時更新預覽並自動儲存
+   */
+  handleSpeciesInput() {
+    const key = this.currentSpeciesKey;
+    const inputTitle = document.getElementById('species-input-title');
+    const inputContent = document.getElementById('species-input-content');
+    const statusEl = document.getElementById('species-save-status');
+
+    if (!this.speciesAnnouncements[key]) {
+      this.speciesAnnouncements[key] = { title: '', content: '' };
+    }
+
+    if (inputTitle) this.speciesAnnouncements[key].title = inputTitle.value;
+    if (inputContent) this.speciesAnnouncements[key].content = inputContent.value;
+
+    if (statusEl) {
+      statusEl.textContent = '○ 儲存中...';
+      statusEl.className = 'text-amber-400 font-mono';
+    }
+
+    this.updateSpeciesLivePreview();
+
+    // 防抖自動儲存
+    clearTimeout(this._speciesAutoSaveTimer);
+    this._speciesAutoSaveTimer = setTimeout(() => {
+      this.saveSpeciesAnnouncements();
+    }, 400);
+  }
+
+  /**
+   * 更新右側即時發布預覽效果
+   */
+  updateSpeciesLivePreview() {
+    const previewEl = document.getElementById('species-live-preview');
+    if (!previewEl) return;
+
+    const key = this.currentSpeciesKey;
+    const data = this.speciesAnnouncements[key] || { title: '', content: '' };
+    const title = (data.title || '').trim();
+    const content = (data.content || '').trim();
+
+    if (!title && !content) {
+      previewEl.innerHTML = '<span class="text-slate-500 italic">尚無內容，請在左側輸入公告標題與內文...</span>';
+      return;
+    }
+
+    let fullText = '';
+    if (title) {
+      fullText += `${title}\n${'━'.repeat(24)}\n`;
+    }
+    if (content) {
+      fullText += content;
+    }
+
+    previewEl.textContent = fullText;
+  }
+
+  /**
+   * 在內文游標處插入常用文字段落標籤
+   */
+  insertSpeciesSnippet(text) {
+    const textarea = document.getElementById('species-input-content');
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    textarea.value = val.substring(0, start) + text + val.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + text.length;
+    textarea.focus();
+
+    this.handleSpeciesInput();
+  }
+
+  /**
+   * 恢復當前物種官方預設懶人包範本
+   */
+  resetSpeciesToDefaultTemplate() {
+    const key = this.currentSpeciesKey;
+    const cfg = this.speciesConfig[key];
+    if (confirm(`確定要將【${cfg.name}】的內容重設為官方推薦預設範本嗎？現有自訂內容將被覆蓋。`)) {
+      const defaults = this.getDefaultSpeciesAnnouncements();
+      if (defaults[key]) {
+        this.speciesAnnouncements[key] = { ...defaults[key] };
+        this.saveSpeciesAnnouncements();
+        this.renderSpeciesTab();
+        this.showToast(`已成功載入【${cfg.name}】預設懶人包範本！`);
+      }
+    }
+  }
+
+  /**
+   * 清空當前物種內文
+   */
+  clearCurrentSpeciesContent() {
+    const key = this.currentSpeciesKey;
+    const cfg = this.speciesConfig[key];
+    if (confirm(`確定要清空【${cfg.name}】的輸入文字嗎？`)) {
+      this.speciesAnnouncements[key] = { title: '', content: '' };
+      this.saveSpeciesAnnouncements();
+      this.renderSpeciesTab();
+      this.showToast(`已清空【${cfg.name}】內容`);
+    }
+  }
+
+  /**
+   * 一鍵複製當前物種公告內文 (整合標題與內文，適合 Line / Discord)
+   */
+  copyCurrentSpeciesReport() {
+    const key = this.currentSpeciesKey;
+    const cfg = this.speciesConfig[key];
+    const data = this.speciesAnnouncements[key] || { title: '', content: '' };
+
+    const title = (data.title || '').trim();
+    const content = (data.content || '').trim();
+
+    if (!title && !content) {
+      alert(`【${cfg.name}】目前尚無任何文字內容可複製！`);
+      return;
+    }
+
+    let report = '';
+    if (title) {
+      report += `${title}\n${'━'.repeat(24)}\n`;
+    }
+    if (content) {
+      report += content;
+    }
+
+    navigator.clipboard.writeText(report).then(() => {
+      this.showToast(`📋 已成功複製【${cfg.name}】公告內文至剪貼簿！`);
+    }).catch(() => {
+      prompt(`請手動複製【${cfg.name}】公告內容：`, report);
+    });
   }
 
   /**

@@ -191,6 +191,10 @@
         <span>懲罰名單</span>
         <span id="tab-penalty-badge" class="text-xs px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800/60 font-mono">0</span>
       </button>
+      <button id="tab-btn-species" onclick="app.switchTab('species')" class="tab-btn px-4 py-2 text-sm font-bold rounded-xl transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
+        <span>🧬</span>
+        <span>物種懶人包</span>
+      </button>
     </div>
 
     <!-- ================= 分頁 1：公會成員總表視圖 ================= -->
@@ -591,7 +595,140 @@
 
     </div>
 
-  </main>
+    <!-- ================= 分頁 4：物種懶人包視圖 ================= -->
+    <div id="view-species" class="hidden space-y-4">
+      
+      <!-- 內分頁標籤導航欄 (五大物種週切換) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+        <div class="flex items-center flex-wrap gap-2" id="species-subtabs-container">
+          <button onclick="app.switchSpeciesSubTab('beetle')" id="species-tab-btn-beetle" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-950 text-emerald-300 border border-emerald-700 shadow-sm">
+            <span class="text-base">🪲</span>
+            <span>蜣螂週</span>
+          </button>
+          <button onclick="app.switchSpeciesSubTab('goldfish')" id="species-tab-btn-goldfish" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent">
+            <span class="text-base">🐠</span>
+            <span>金魚週</span>
+          </button>
+          <button onclick="app.switchSpeciesSubTab('clam')" id="species-tab-btn-clam" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent">
+            <span class="text-base">🐚</span>
+            <span>北極貝週</span>
+          </button>
+          <button onclick="app.switchSpeciesSubTab('hamster')" id="species-tab-btn-hamster" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent">
+            <span class="text-base">🐹</span>
+            <span>倉鼠週</span>
+          </button>
+          <button onclick="app.switchSpeciesSubTab('mantis')" id="species-tab-btn-mantis" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent">
+            <span class="text-base">🦗</span>
+            <span>螳螂週</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <button onclick="app.resetSpeciesToDefaultTemplate()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition" title="載入官方標準物種打法懶人包範本">
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            載入預設範本
+          </button>
+          <button onclick="app.copyCurrentSpeciesReport()" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+            📋 一鍵複製公告內文
+          </button>
+        </div>
+      </div>
+
+      <!-- 編輯器與社群發布即時預覽區 (左右雙欄響應式佈局) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        
+        <!-- 左欄：自訂文字輸入欄位區 (7 欄寬) -->
+        <div class="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 flex flex-col">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span id="species-badge-icon" class="text-2xl">🪲</span>
+              <div>
+                <h3 id="species-card-title" class="text-sm font-bold text-white flex items-center gap-2">
+                  <span>蜣螂週 - 公告自訂編輯區</span>
+                  <span id="species-current-badge" class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono">第 1 週物種</span>
+                </h3>
+                <p class="text-[11px] text-slate-400">可自由輸入文字、排版兵種與任務分配，變更將即時自動保存</p>
+              </div>
+            </div>
+            <div class="text-[11px] text-slate-500 font-mono flex items-center gap-1">
+              <span id="species-save-status" class="text-emerald-400">● 已自動儲存</span>
+            </div>
+          </div>
+
+          <!-- 公告標題輸入欄位 -->
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+              <span>📌 公告標題 / 主旨</span>
+              <span class="text-[11px] text-slate-500 font-normal">顯示於公告最頂端</span>
+            </label>
+            <input type="text" id="species-input-title" placeholder="例如：【蝸牛之家】本週物種戰作戰指令 - 🪲 蜣螂週" 
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-medium focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 transition"
+              oninput="app.handleSpeciesInput()">
+          </div>
+
+          <!-- 快速排版標籤工具列 -->
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>📝 公告詳細內文 (支援換行、表情符號、自行編輯)</span>
+              <span class="text-[11px] text-slate-500 font-normal">點擊標籤可快速插入文字段落</span>
+            </label>
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button type="button" onclick="app.insertSpeciesSnippet('【本週作戰目標】\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 作戰目標</button>
+              <button type="button" onclick="app.insertSpeciesSnippet('【兵種克制與推薦】\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 兵種克制</button>
+              <button type="button" onclick="app.insertSpeciesSnippet('【採集挖礦分配】\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 採集分配</button>
+              <button type="button" onclick="app.insertSpeciesSnippet('【敢死隊與打王重點】\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 打王重點</button>
+              <button type="button" onclick="app.insertSpeciesSnippet('【注意事項與紀律】\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 注意事項</button>
+              <button type="button" onclick="app.insertSpeciesSnippet('🐌 各位蝸友齊心協力，本週全力衝刺！💪\n')" class="text-[11px] px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">+ 結尾標語</button>
+            </div>
+
+            <!-- 自行輸入文字的多行欄位 -->
+            <textarea id="species-input-content" rows="15" placeholder="請在此輸入本週物種週詳細懶人包文字、作戰公告、兵種配置及相關提醒..."
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 text-xs text-white leading-relaxed focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 font-mono transition resize-y min-h-[300px]"
+              oninput="app.handleSpeciesInput()"></textarea>
+          </div>
+
+          <!-- 底部操作列 -->
+          <div class="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800">
+            <button onclick="app.clearCurrentSpeciesContent()" class="px-3 py-1.5 rounded-lg hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 text-xs transition">
+              清空文字
+            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="app.saveSpeciesAnnouncements()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
+                手動保存
+              </button>
+              <button onclick="app.copyCurrentSpeciesReport()" class="btn-primary px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                複製本週公告內文
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右欄：社群預覽效果 (Line / Discord 模擬框, 5 欄寬) -->
+        <div class="lg:col-span-5 bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">預覽</span>
+              <h4 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <span>Line / Discord 貼出效果預覽</span>
+              </h4>
+            </div>
+            <button onclick="app.copyCurrentSpeciesReport()" class="text-xs text-emerald-400 hover:text-emerald-300 font-bold hover:underline flex items-center gap-1">
+              <span>點此複製</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+            </button>
+          </div>
+          <!-- 預覽容器 -->
+          <div class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-y-auto max-h-[560px] shadow-inner font-mono text-xs whitespace-pre-wrap text-slate-200 select-all leading-relaxed" id="species-live-preview">
+            <!-- 即時動態生成公告預覽 -->
+          </div>
+          <p class="text-[11px] text-slate-500 text-center">💡 點擊「一鍵複製公告內文」後，可直接在 Line / Discord 按 Ctrl+V 貼上發布</p>
+        </div>
+
+      </div>
+
+    </div>
 
   <!-- 頁尾 -->
   <footer class="border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">

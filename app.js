@@ -47,16 +47,14 @@ class GuildApp {
     this.onlyStagnantFilter = false; // 是否僅篩選顯示超過 8 週未更新的成員
     this.stagnantThreshold = 8;     // 數據無變化之提醒週數門檻 (8 週)
 
-    // 物種懶人包初始化
-    this.currentSpeciesKey = 'beetle'; // 當前選中之物種週 ('beetle' | 'goldfish' | 'clam' | 'hamster' | 'mantis')
-    this.speciesConfig = {
-      beetle: { name: '蜣螂週', icon: '🪲', badge: '第 1 週物種' },
-      goldfish: { name: '金魚週', icon: '🐠', badge: '第 2 週物種' },
-      clam: { name: '北極貝週', icon: '🐚', badge: '第 3 週物種' },
-      hamster: { name: '倉鼠週', icon: '🐹', badge: '第 4 週物種' },
-      mantis: { name: '螳螂週', icon: '🦗', badge: '第 5 週物種' }
-    };
-    this.speciesAnnouncements = this.loadSpeciesAnnouncements();
+    // 全公會公告欄位資料初始化
+    this.currentGuildNoticeType = 'vanguard'; // 'vanguard' | 'recruit' | 'discipline' | 'custom'
+    this.guildNoticeData = this.loadGuildNoticeData();
+    this.isGuildNoticeCollapsed = false;
+
+    // 動態物種懶人包初始化 (可自由新增、修改名稱、刪減、自動匹配 Icon)
+    this.speciesList = this.loadSpeciesList();
+    this.currentSpeciesId = (this.speciesList[0] && this.speciesList[0].id) || 'beetle';
 
     this.init();
   }
@@ -1656,11 +1654,16 @@ class GuildApp {
    */
   render() {
     this.renderHeaderStats();
+    this.renderGuildNoticePanel();
     this.renderWeekSelector();
     this.renderTable();
     this.renderVanguardTable();
     this.renderPenaltyTable();
     this.updatePenaltyMemberDatalist();
+    this.renderSpeciesSubTabs();
+    if (this.currentTab === 'species') {
+      this.renderSpeciesTab();
+    }
   }
 
   /**
@@ -2828,15 +2831,299 @@ class GuildApp {
   }
 
   /* ============================================================
-   * 物種懶人包模組 (五大物種週公告自訂編輯、即時預覽與一鍵複製)
+   * 全公會公告欄位模組 (敢死隊提醒、公會招募令、戰備紀律、自訂公告)
    * ============================================================ */
 
   /**
-   * 取得五大物種週標準預設懶人包範本
+   * 取得預設全公會公告範本
    */
-  getDefaultSpeciesAnnouncements() {
+  getDefaultGuildNoticeData() {
     return {
-      beetle: {
+      vanguard: {
+        title: '🎯【敢死隊戰備提醒與指引】',
+        content: `【敢死隊出擊與演練提醒】
+1. 敢死隊正選 30 人與候補 5 人名冊已依本週戰力最新數據更新完畢。
+2. 請正選隊員於週五晚間前至「兵種演練」設定好本週最強輸出陣容。
+3. 跨服王開打時間：週六晚間 20:00 統一吹集結號，聽幹部口令集火輸出。
+4. 若本週臨時無法出席，請務必提前向副會長或長老報備，以便候補隊員即時遞補上陣！
+
+🐌 敢死先鋒，衝鋒陷陣！全體加油！💪`
+      },
+      recruit: {
+        title: '📢【公會對外招生招募令】',
+        content: `【🐌 蝸牛之家 公會招生招募令 🐌】
+
+🌟 公會特色：
+• 氛圍融洽，幹部認真，每週固定提供專屬戰力統計與物種作戰懶人包！
+• 跨服物種戰穩定前排，每週鑽石、資源分紅領好領滿！
+• 設有專屬敢死隊培育梯隊，新手老手皆有發揮舞台！
+
+📌 招募條件：
+1. 每日活躍打卡、物種戰挖礦搬磚不摸魚。
+2. 能加入 LINE / Discord 公會群組，重要作戰聽指揮。
+3. 戰力無強制門檻，歡迎長期活躍、熱愛蝸牛的朋友！
+
+💌 意者請私訊公會長或長老，名額有限，先到先得！✨`
+      },
+      discipline: {
+        title: '📜【公會常規與戰備紀律手冊】',
+        content: `【🐌 蝸牛之家 全體公約與作戰紀律】
+
+1. 【日常紀律】
+• 連續超過 3 天未登入且未事先請假者，將依規降為編外成員。
+• 每日記得完成公會簽到與互助加速氣泡。
+
+2. 【物種戰紀律】
+• 週五 05:00 ～ 週一 04:59 為物種戰期間，全員需完成個人搬磚任務。
+• 敢死隊成員無故缺席王戰者，將登記入懲罰名單並取消下週敢死隊資格。
+
+3. 【數據更新】
+• 請成員定期上傳演練截圖更新數據，連續 8 週無變化者將列入催繳清單。
+
+團結一心，共創榮耀！感謝各位隊員的配合與付出！🐌✨`
+      },
+      custom: {
+        title: '✏️【本週公會特別通知】',
+        content: `【本週公會重要行事曆與臨時通知】
+
+請公會長或幹部在此輸入自訂文字內容。
+支援直接點擊「編輯公告」修改，並可一鍵複製至 LINE 群組或遊戲聊天頻道！`
+      }
+    };
+  }
+
+  /**
+   * 載入全公會公告資料
+   */
+  loadGuildNoticeData() {
+    const defaults = this.getDefaultGuildNoticeData();
+    try {
+      const saved = localStorage.getItem('guild_notice_data');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...defaults, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.warn('載入公會公告資料失敗:', e);
+    }
+    return defaults;
+  }
+
+  /**
+   * 儲存全公會公告資料
+   */
+  saveGuildNoticeData() {
+    try {
+      localStorage.setItem('guild_notice_data', JSON.stringify(this.guildNoticeData));
+    } catch (e) {
+      console.error('儲存公會公告資料失敗:', e);
+    }
+  }
+
+  /**
+   * 渲染公會公告面板
+   */
+  renderGuildNoticePanel() {
+    const type = this.currentGuildNoticeType || 'vanguard';
+    const data = this.guildNoticeData[type] || this.guildNoticeData.vanguard;
+
+    // 1. 更新類型標籤狀態
+    const typeNames = {
+      vanguard: '🎯 敢死隊指引',
+      recruit: '📢 公會招募令',
+      discipline: '📜 戰備紀律',
+      custom: '✏️ 自訂公告'
+    };
+    const tagEl = document.getElementById('guild-notice-active-tag');
+    if (tagEl) tagEl.textContent = typeNames[type] || '公會公告';
+
+    const tabs = ['vanguard', 'recruit', 'discipline', 'custom'];
+    tabs.forEach(t => {
+      const btn = document.getElementById(`notice-tab-${t}`);
+      if (btn) {
+        if (t === type) {
+          btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-indigo-950 text-indigo-300 border border-indigo-700 shadow-sm';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent';
+        }
+      }
+    });
+
+    // 2. 更新檢視模式內容
+    const titleEl = document.getElementById('guild-notice-view-title');
+    const contentEl = document.getElementById('guild-notice-view-content');
+    if (titleEl) titleEl.textContent = data.title || '無標題';
+    if (contentEl) contentEl.textContent = data.content || '無內容';
+
+    // 3. 更新編輯模式欄位
+    const inputTitle = document.getElementById('guild-notice-input-title');
+    const inputContent = document.getElementById('guild-notice-input-content');
+    if (inputTitle) inputTitle.value = data.title || '';
+    if (inputContent) inputContent.value = data.content || '';
+  }
+
+  /**
+   * 切換公會公告類型 (敢死隊/招生/紀律/自訂)
+   */
+  switchGuildNoticeType(type) {
+    if (!this.guildNoticeData[type]) return;
+    this.currentGuildNoticeType = type;
+    this.renderGuildNoticePanel();
+  }
+
+  /**
+   * 切換公告檢視與編輯模式
+   */
+  toggleEditGuildNotice() {
+    const viewBox = document.getElementById('guild-notice-view-box');
+    const editBox = document.getElementById('guild-notice-edit-box');
+    const btn = document.getElementById('btn-toggle-edit-notice');
+    if (!viewBox || !editBox) return;
+
+    const isEditing = !editBox.classList.contains('hidden');
+    if (isEditing) {
+      editBox.classList.add('hidden');
+      viewBox.classList.remove('hidden');
+      if (btn) btn.innerHTML = '✏️ 編輯公告';
+    } else {
+      // 確保展開
+      const body = document.getElementById('guild-notice-body');
+      if (body && body.classList.contains('hidden')) {
+        this.toggleCollapseGuildNotice();
+      }
+      viewBox.classList.add('hidden');
+      editBox.classList.remove('hidden');
+      if (btn) btn.innerHTML = '✕ 取消編輯';
+      const inputTitle = document.getElementById('guild-notice-input-title');
+      if (inputTitle) inputTitle.focus();
+    }
+  }
+
+  /**
+   * 儲存編輯後的公告內容
+   */
+  saveGuildNoticeFromEdit() {
+    const type = this.currentGuildNoticeType;
+    const inputTitle = document.getElementById('guild-notice-input-title');
+    const inputContent = document.getElementById('guild-notice-input-content');
+
+    const title = inputTitle ? inputTitle.value.trim() : '';
+    const content = inputContent ? inputContent.value.trim() : '';
+
+    this.guildNoticeData[type] = {
+      title: title || '公會公告',
+      content: content || ''
+    };
+
+    this.saveGuildNoticeData();
+    this.renderGuildNoticePanel();
+    this.toggleEditGuildNotice();
+    this.showToast('✅ 公告內容已儲存！');
+  }
+
+  /**
+   * 恢復當前公告為官方範本
+   */
+  resetCurrentGuildNoticeToDefault() {
+    const type = this.currentGuildNoticeType;
+    const defaults = this.getDefaultGuildNoticeData();
+    if (confirm('確定要載入此類別的官方推薦公告範本嗎？現有自訂內容將被覆蓋。')) {
+      if (defaults[type]) {
+        this.guildNoticeData[type] = { ...defaults[type] };
+        this.saveGuildNoticeData();
+        this.renderGuildNoticePanel();
+        this.showToast('已載入推薦公告範本！');
+      }
+    }
+  }
+
+  /**
+   * 折疊 / 展開公告欄位
+   */
+  toggleCollapseGuildNotice() {
+    const body = document.getElementById('guild-notice-body');
+    const btn = document.getElementById('btn-collapse-notice');
+    if (!body) return;
+
+    this.isGuildNoticeCollapsed = !this.isGuildNoticeCollapsed;
+    if (this.isGuildNoticeCollapsed) {
+      body.classList.add('hidden');
+      if (btn) btn.innerHTML = '▸ 展開';
+    } else {
+      body.classList.remove('hidden');
+      if (btn) btn.innerHTML = '▾ 折疊';
+    }
+  }
+
+  /**
+   * 一鍵複製全公會公告內容 (適合 Line / Discord)
+   */
+  copyGuildNotice() {
+    const type = this.currentGuildNoticeType;
+    const data = this.guildNoticeData[type] || { title: '', content: '' };
+    const title = (data.title || '').trim();
+    const content = (data.content || '').trim();
+
+    if (!title && !content) {
+      alert('目前公告內容為空！');
+      return;
+    }
+
+    const fullNotice = `${title}\n${'━'.repeat(24)}\n${content}`;
+    navigator.clipboard.writeText(fullNotice).then(() => {
+      this.showToast('📋 公告內容已成功複製到剪貼簿！');
+    }).catch(() => {
+      prompt('請手動複製公告文字：', fullNotice);
+    });
+  }
+
+  /* ============================================================
+   * 動態物種懶人包模組 (自由新增、修改名稱、刪減、自動匹配 Icon、一鍵複製)
+   * ============================================================ */
+
+  /**
+   * 自動依物種名稱智能偵測並匹配 Emoji 圖標
+   */
+  detectSpeciesIcon(name) {
+    if (!name || typeof name !== 'string') return '🧬';
+    const s = name.trim().toLowerCase();
+
+    // 關鍵字模式匹配
+    if (/蜣螂|糞金龜|金龜|屎殼郎|甲蟲|甲壳|甲殼|甲/.test(s)) return '🪲';
+    if (/金魚|錦鯉|魚|水族|水系|鯊|鯨/.test(s)) return '🐠';
+    if (/北極貝|貝|蚌|扇貝|蛤|螺|海鮮/.test(s)) return '🐚';
+    if (/倉鼠|鼠|松鼠|豚鼠|老鼠|土撥鼠/.test(s)) return '🐹';
+    if (/螳螂|刀客|雙刀|螳/.test(s)) return '🦗';
+    if (/蜜蜂|蜂|黃蜂|虎頭蜂|熊蜂/.test(s)) return '🐝';
+    if (/蜘蛛|蜘蛛俠|蛛|織網/.test(s)) return '🕷️';
+    if (/蠍|毒蠍|蠍子/.test(s)) return '🦂';
+    if (/蟹|螃蟹|帝王蟹|青蟹/.test(s)) return '🦀';
+    if (/蝶|蝴蝶|飛蛾|蛾/.test(s)) return '🦋';
+    if (/蟻|螞蟻|工蟻|兵蟻|蟻后/.test(s)) return '🐜';
+    if (/龍|巨龍|神龍|黑龍|火龍|幼龍/.test(s)) return '🐉';
+    if (/鷹|雕|鳥|飛禽|烏鴉|隼/.test(s)) return '🦅';
+    if (/蛇|毒蛇|蟒|巨蟒/.test(s)) return '🐍';
+    if (/機械|機器|科技|晶片|鋼鐵|高達/.test(s)) return '🤖';
+    if (/天使|神聖|光系|光芒|羽翼/.test(s)) return '👼';
+    if (/惡魔|魔鬼|地獄|暗黑|暗系/.test(s)) return '😈';
+    if (/活屍|殭屍|喪屍|亡靈|骷髏/.test(s)) return '🧟';
+    if (/異種|異形|外星|變異/.test(s)) return '👽';
+    if (/蝸牛|蝸|黃金蝸牛/.test(s)) return '🐌';
+
+    return '🧬';
+  }
+
+  /**
+   * 取得預設物種清單 (預設五大物種週)
+   */
+  getDefaultSpeciesList() {
+    return [
+      {
+        id: 'beetle',
+        name: '蜣螂週',
+        icon: '🪲',
         title: '【蝸牛之家】🪲 蜣螂週物種戰作戰指令與重點懶人包',
         content: `【本週物種】🪲 蜣螂（地下防空洞）
 【活動時間】本週五 05:00 ～ 下週一 04:59
@@ -2858,7 +3145,10 @@ class GuildApp {
 
 🐌 蝸牛之家全員齊心協力，本週全力衝刺！🪲💪`
       },
-      goldfish: {
+      {
+        id: 'goldfish',
+        name: '金魚週',
+        icon: '🐠',
         title: '【蝸牛之家】🐠 金魚週物種戰作戰指令與重點懶人包',
         content: `【本週物種】🐠 金魚（水族霸主）
 【活動時間】本週五 05:00 ～ 下週一 04:59
@@ -2880,7 +3170,10 @@ class GuildApp {
 
 🐌 水族爭霸，蝸牛必勝！大家衝刺第一名！🌊💪`
       },
-      clam: {
+      {
+        id: 'clam',
+        name: '北極貝週',
+        icon: '🐚',
         title: '【蝸牛之家】🐚 北極貝週物種戰作戰指令與重點懶人包',
         content: `【本週物種】🐚 北極貝（極地甲殼）
 【活動時間】本週五 05:00 ～ 下週一 04:59
@@ -2902,7 +3195,10 @@ class GuildApp {
 
 🐌 破冰前行，勇奪佳績！北極貝週全員衝鋒！❄️💪`
       },
-      hamster: {
+      {
+        id: 'hamster',
+        name: '倉鼠週',
+        icon: '🐹',
         title: '【蝸牛之家】🐹 倉鼠週物種戰作戰指令與重點懶人包',
         content: `【本週物種】🐹 倉鼠（地道糧倉）
 【活動時間】本週五 05:00 ～ 下週一 04:59
@@ -2924,7 +3220,10 @@ class GuildApp {
 
 🐌 搶空糧倉，打爆倉鼠！公會夥伴們衝呀！🌰💪`
       },
-      mantis: {
+      {
+        id: 'mantis',
+        name: '螳螂週',
+        icon: '🦗',
         title: '【蝸牛之家】🦗 螳螂週物種戰作戰指令與重點懶人包',
         content: `【本週物種】🦗 螳螂（密林刀客）
 【活動時間】本週五 05:00 ～ 下週一 04:59
@@ -2946,119 +3245,150 @@ class GuildApp {
 
 🐌 刀刃無情，蝸牛有心！螳螂週全員出擊！⚔️💪`
       }
-    };
+    ];
   }
 
   /**
-   * 載入儲存的物種懶人包資料 (若無則載入預設範本)
+   * 載入動態物種清單
    */
-  loadSpeciesAnnouncements() {
-    const defaults = this.getDefaultSpeciesAnnouncements();
+  loadSpeciesList() {
+    const defaults = this.getDefaultSpeciesList();
     try {
-      const saved = localStorage.getItem('guild_species_announcements');
+      const saved = localStorage.getItem('guild_species_list');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          return { ...defaults, ...parsed };
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      // 相容舊版 guild_species_announcements 轉移
+      const oldSaved = localStorage.getItem('guild_species_announcements');
+      if (oldSaved) {
+        const oldObj = JSON.parse(oldSaved);
+        if (oldObj && typeof oldObj === 'object') {
+          return defaults.map(sp => {
+            if (oldObj[sp.id]) {
+              return {
+                ...sp,
+                title: oldObj[sp.id].title || sp.title,
+                content: oldObj[sp.id].content || sp.content
+              };
+            }
+            return sp;
+          });
         }
       }
     } catch (e) {
-      console.warn('載入物種懶人包失敗，使用預設值:', e);
+      console.warn('載入物種清單失敗，使用預設值:', e);
     }
     return defaults;
   }
 
   /**
-   * 儲存物種懶人包資料至本地與伺服器
+   * 儲存動態物種清單
    */
-  saveSpeciesAnnouncements() {
+  saveSpeciesList() {
     try {
-      localStorage.setItem('guild_species_announcements', JSON.stringify(this.speciesAnnouncements));
+      localStorage.setItem('guild_species_list', JSON.stringify(this.speciesList));
       const statusEl = document.getElementById('species-save-status');
       if (statusEl) {
         statusEl.textContent = '● 已自動儲存';
         statusEl.className = 'text-emerald-400 font-mono';
       }
-      this.saveToStorage();
     } catch (e) {
-      console.error('儲存物種懶人包失敗:', e);
+      console.error('儲存物種清單失敗:', e);
     }
   }
 
   /**
-   * 渲染物種懶人包分頁內容
+   * 渲染物種子分頁按鈕清單 (動態渲染)
    */
-  renderSpeciesTab() {
-    const key = this.currentSpeciesKey || 'beetle';
-    const cfg = this.speciesConfig[key] || this.speciesConfig.beetle;
-    const currentData = this.speciesAnnouncements[key] || { title: '', content: '' };
+  renderSpeciesSubTabs() {
+    const container = document.getElementById('species-subtabs-container');
+    if (!container) return;
 
-    // 1. 更新各子分頁按鈕高亮
-    const keys = ['beetle', 'goldfish', 'clam', 'hamster', 'mantis'];
-    keys.forEach(k => {
-      const btn = document.getElementById(`species-tab-btn-${k}`);
-      if (btn) {
-        if (k === key) {
-          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-950 text-emerald-300 border border-emerald-600 shadow-md ring-1 ring-emerald-500/50';
-        } else {
-          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent';
-        }
-      }
-    });
+    if (!this.speciesList || this.speciesList.length === 0) {
+      this.speciesList = this.getDefaultSpeciesList();
+    }
 
-    // 2. 更新頂部卡片標題與圖標
-    const iconEl = document.getElementById('species-badge-icon');
-    const titleCardEl = document.getElementById('species-card-title');
-    const badgeEl = document.getElementById('species-current-badge');
-    if (iconEl) iconEl.textContent = cfg.icon;
-    if (titleCardEl) titleCardEl.innerHTML = `<span>${cfg.name} - 公告自訂編輯區</span>`;
-    if (badgeEl) badgeEl.textContent = cfg.badge;
+    // 確保當前 ID 有效
+    const currentItem = this.speciesList.find(s => s.id === this.currentSpeciesId) || this.speciesList[0];
+    this.currentSpeciesId = currentItem.id;
 
-    // 3. 填充輸入欄位
-    const inputTitle = document.getElementById('species-input-title');
-    const inputContent = document.getElementById('species-input-content');
-    if (inputTitle) inputTitle.value = currentData.title || '';
-    if (inputContent) inputContent.value = currentData.content || '';
+    container.innerHTML = this.speciesList.map((sp, idx) => {
+      const isActive = sp.id === this.currentSpeciesId;
+      const btnClass = isActive
+        ? 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-950 text-emerald-300 border border-emerald-600 shadow-md ring-1 ring-emerald-500/50'
+        : 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-transparent';
 
-    // 4. 即時更新社群預覽框
-    this.updateSpeciesLivePreview();
+      return `
+        <button onclick="app.switchSpeciesSubTab('${sp.id}')" id="species-tab-btn-${sp.id}" class="${btnClass}">
+          <span class="text-base">${sp.icon || '🧬'}</span>
+          <span>${this.escapeHtml(sp.name)}</span>
+        </button>
+      `;
+    }).join('');
   }
 
   /**
-   * 切換物種子分頁 (蜣螂、金魚、北極貝、倉鼠、螳螂)
+   * 切換物種子分頁
    */
-  switchSpeciesSubTab(subTabKey) {
-    if (!this.speciesConfig[subTabKey]) return;
-
-    // 先儲存目前分頁的輸入內容
-    const curKey = this.currentSpeciesKey;
-    const inputTitle = document.getElementById('species-input-title');
-    const inputContent = document.getElementById('species-input-content');
-    if (inputTitle && inputContent && this.speciesAnnouncements[curKey]) {
-      this.speciesAnnouncements[curKey].title = inputTitle.value;
-      this.speciesAnnouncements[curKey].content = inputContent.value;
-      this.saveSpeciesAnnouncements();
+  switchSpeciesSubTab(speciesId) {
+    // 切換前先儲存當前輸入內容
+    const curItem = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (curItem) {
+      const inputTitle = document.getElementById('species-input-title');
+      const inputContent = document.getElementById('species-input-content');
+      if (inputTitle) curItem.title = inputTitle.value;
+      if (inputContent) curItem.content = inputContent.value;
+      this.saveSpeciesList();
     }
 
-    this.currentSpeciesKey = subTabKey;
+    this.currentSpeciesId = speciesId;
+    this.renderSpeciesSubTabs();
     this.renderSpeciesTab();
   }
 
   /**
-   * 處理輸入事件：即時更新預覽並自動儲存
+   * 渲染物種懶人包內容 (標題、內文、Icon、卡片標題)
+   */
+  renderSpeciesTab() {
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId) || this.speciesList[0];
+    if (!item) return;
+
+    // 1. 更新卡片圖標與標題
+    const iconEl = document.getElementById('species-badge-icon');
+    const titleCardEl = document.getElementById('species-card-title');
+    const badgeEl = document.getElementById('species-current-badge');
+    const idx = this.speciesList.findIndex(s => s.id === item.id);
+
+    if (iconEl) iconEl.textContent = item.icon || '🧬';
+    if (titleCardEl) titleCardEl.innerHTML = `<span>${this.escapeHtml(item.name)} - 公告自訂編輯區</span>`;
+    if (badgeEl) badgeEl.textContent = `第 ${idx + 1} 週物種`;
+
+    // 2. 填充輸入欄位
+    const inputTitle = document.getElementById('species-input-title');
+    const inputContent = document.getElementById('species-input-content');
+    if (inputTitle) inputTitle.value = item.title || '';
+    if (inputContent) inputContent.value = item.content || '';
+
+    // 3. 更新即時社群預覽框
+    this.updateSpeciesLivePreview();
+  }
+
+  /**
+   * 即時輸入更新與自動儲存
    */
   handleSpeciesInput() {
-    const key = this.currentSpeciesKey;
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) return;
+
     const inputTitle = document.getElementById('species-input-title');
     const inputContent = document.getElementById('species-input-content');
     const statusEl = document.getElementById('species-save-status');
 
-    if (!this.speciesAnnouncements[key]) {
-      this.speciesAnnouncements[key] = { title: '', content: '' };
-    }
-
-    if (inputTitle) this.speciesAnnouncements[key].title = inputTitle.value;
-    if (inputContent) this.speciesAnnouncements[key].content = inputContent.value;
+    if (inputTitle) item.title = inputTitle.value;
+    if (inputContent) item.content = inputContent.value;
 
     if (statusEl) {
       statusEl.textContent = '○ 儲存中...';
@@ -3070,7 +3400,7 @@ class GuildApp {
     // 防抖自動儲存
     clearTimeout(this._speciesAutoSaveTimer);
     this._speciesAutoSaveTimer = setTimeout(() => {
-      this.saveSpeciesAnnouncements();
+      this.saveSpeciesList();
     }, 400);
   }
 
@@ -3081,10 +3411,14 @@ class GuildApp {
     const previewEl = document.getElementById('species-live-preview');
     if (!previewEl) return;
 
-    const key = this.currentSpeciesKey;
-    const data = this.speciesAnnouncements[key] || { title: '', content: '' };
-    const title = (data.title || '').trim();
-    const content = (data.content || '').trim();
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) {
+      previewEl.innerHTML = '<span class="text-slate-500 italic">尚無物種資料</span>';
+      return;
+    }
+
+    const title = (item.title || '').trim();
+    const content = (item.content || '').trim();
 
     if (!title && !content) {
       previewEl.innerHTML = '<span class="text-slate-500 italic">尚無內容，請在左側輸入公告標題與內文...</span>';
@@ -3121,49 +3455,17 @@ class GuildApp {
   }
 
   /**
-   * 恢復當前物種官方預設懶人包範本
-   */
-  resetSpeciesToDefaultTemplate() {
-    const key = this.currentSpeciesKey;
-    const cfg = this.speciesConfig[key];
-    if (confirm(`確定要將【${cfg.name}】的內容重設為官方推薦預設範本嗎？現有自訂內容將被覆蓋。`)) {
-      const defaults = this.getDefaultSpeciesAnnouncements();
-      if (defaults[key]) {
-        this.speciesAnnouncements[key] = { ...defaults[key] };
-        this.saveSpeciesAnnouncements();
-        this.renderSpeciesTab();
-        this.showToast(`已成功載入【${cfg.name}】預設懶人包範本！`);
-      }
-    }
-  }
-
-  /**
-   * 清空當前物種內文
-   */
-  clearCurrentSpeciesContent() {
-    const key = this.currentSpeciesKey;
-    const cfg = this.speciesConfig[key];
-    if (confirm(`確定要清空【${cfg.name}】的輸入文字嗎？`)) {
-      this.speciesAnnouncements[key] = { title: '', content: '' };
-      this.saveSpeciesAnnouncements();
-      this.renderSpeciesTab();
-      this.showToast(`已清空【${cfg.name}】內容`);
-    }
-  }
-
-  /**
-   * 一鍵複製當前物種公告內文 (整合標題與內文，適合 Line / Discord)
+   * 一鍵複製當前物種公告內文 (整合標題與內文)
    */
   copyCurrentSpeciesReport() {
-    const key = this.currentSpeciesKey;
-    const cfg = this.speciesConfig[key];
-    const data = this.speciesAnnouncements[key] || { title: '', content: '' };
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) return;
 
-    const title = (data.title || '').trim();
-    const content = (data.content || '').trim();
+    const title = (item.title || '').trim();
+    const content = (item.content || '').trim();
 
     if (!title && !content) {
-      alert(`【${cfg.name}】目前尚無任何文字內容可複製！`);
+      alert(`【${item.name}】目前尚無任何文字內容可複製！`);
       return;
     }
 
@@ -3176,10 +3478,189 @@ class GuildApp {
     }
 
     navigator.clipboard.writeText(report).then(() => {
-      this.showToast(`📋 已成功複製【${cfg.name}】公告內文至剪貼簿！`);
+      this.showToast(`📋 已成功複製【${item.name}】公告內文至剪貼簿！`);
     }).catch(() => {
-      prompt(`請手動複製【${cfg.name}】公告內容：`, report);
+      prompt(`請手動複製【${item.name}】公告內容：`, report);
     });
+  }
+
+  /**
+   * 清空當前物種內文
+   */
+  clearCurrentSpeciesContent() {
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) return;
+
+    if (confirm(`確定要清空【${item.name}】的輸入文字嗎？`)) {
+      item.title = '';
+      item.content = '';
+      this.saveSpeciesList();
+      this.renderSpeciesTab();
+      this.showToast(`已清空【${item.name}】內容`);
+    }
+  }
+
+  /**
+   * 載入官方標準物種預設範本
+   */
+  resetSpeciesToDefaultTemplate() {
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) return;
+
+    if (confirm(`確定要將【${item.name}】的內容重設為官方推薦預設範本嗎？現有自訂內容將被覆蓋。`)) {
+      const defaults = this.getDefaultSpeciesList();
+      const match = defaults.find(d => d.id === item.id) || defaults.find(d => d.name === item.name) || defaults[0];
+      if (match) {
+        item.title = match.title;
+        item.content = match.content;
+        this.saveSpeciesList();
+        this.renderSpeciesTab();
+        this.showToast(`已成功載入【${item.name}】預設範本！`);
+      }
+    }
+  }
+
+  /**
+   * 開啟「新增物種」彈窗
+   */
+  openAddSpeciesModal() {
+    const titleEl = document.getElementById('modal-species-title');
+    const nameInput = document.getElementById('modal-species-name');
+    const iconInput = document.getElementById('modal-species-icon');
+    const previewEl = document.getElementById('modal-species-icon-preview');
+    const idInput = document.getElementById('modal-species-id');
+    const isEditInput = document.getElementById('modal-species-is-edit');
+    const headerIconEl = document.getElementById('modal-species-header-icon');
+
+    if (titleEl) titleEl.textContent = '➕ 新增物種週';
+    if (headerIconEl) headerIconEl.textContent = '🧬';
+    if (nameInput) nameInput.value = '';
+    if (iconInput) iconInput.value = '🧬';
+    if (previewEl) previewEl.textContent = '🧬';
+    if (idInput) idInput.value = 'sp_' + Date.now();
+    if (isEditInput) isEditInput.value = '0';
+
+    this.openModal('species-edit-modal');
+    if (nameInput) setTimeout(() => nameInput.focus(), 100);
+  }
+
+  /**
+   * 開啟「編輯/重新命名物種」彈窗
+   */
+  openEditSpeciesModal() {
+    const item = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!item) return;
+
+    const titleEl = document.getElementById('modal-species-title');
+    const nameInput = document.getElementById('modal-species-name');
+    const iconInput = document.getElementById('modal-species-icon');
+    const previewEl = document.getElementById('modal-species-icon-preview');
+    const idInput = document.getElementById('modal-species-id');
+    const isEditInput = document.getElementById('modal-species-is-edit');
+    const headerIconEl = document.getElementById('modal-species-header-icon');
+
+    if (titleEl) titleEl.textContent = `✏️ 編輯物種：${item.name}`;
+    if (headerIconEl) headerIconEl.textContent = item.icon || '🧬';
+    if (nameInput) nameInput.value = item.name;
+    if (iconInput) iconInput.value = item.icon || '🧬';
+    if (previewEl) previewEl.textContent = item.icon || '🧬';
+    if (idInput) idInput.value = item.id;
+    if (isEditInput) isEditInput.value = '1';
+
+    this.openModal('species-edit-modal');
+    if (nameInput) setTimeout(() => nameInput.focus(), 100);
+  }
+
+  /**
+   * 物種彈窗名稱輸入時自動匹配 Icon
+   */
+  handleSpeciesNameModalInput(val) {
+    const autoIcon = this.detectSpeciesIcon(val);
+    const iconInput = document.getElementById('modal-species-icon');
+    const previewEl = document.getElementById('modal-species-icon-preview');
+    if (iconInput) iconInput.value = autoIcon;
+    if (previewEl) previewEl.textContent = autoIcon;
+  }
+
+  /**
+   * 手動選取推薦 Emoji 圖標
+   */
+  setSpeciesModalIcon(emoji) {
+    const iconInput = document.getElementById('modal-species-icon');
+    const previewEl = document.getElementById('modal-species-icon-preview');
+    if (iconInput) iconInput.value = emoji;
+    if (previewEl) previewEl.textContent = emoji;
+  }
+
+  /**
+   * 儲存彈窗中的物種 (新增或更新)
+   */
+  saveSpeciesMetaFromModal() {
+    const nameInput = document.getElementById('modal-species-name');
+    const iconInput = document.getElementById('modal-species-icon');
+    const idInput = document.getElementById('modal-species-id');
+    const isEditInput = document.getElementById('modal-species-is-edit');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name) {
+      alert('請輸入物種名稱！');
+      return;
+    }
+
+    const icon = iconInput ? (iconInput.value || this.detectSpeciesIcon(name)) : this.detectSpeciesIcon(name);
+    const isEdit = isEditInput ? isEditInput.value === '1' : false;
+    const id = (idInput && idInput.value) ? idInput.value : ('sp_' + Date.now());
+
+    if (isEdit) {
+      const idx = this.speciesList.findIndex(s => s.id === id);
+      if (idx !== -1) {
+        this.speciesList[idx].name = name;
+        this.speciesList[idx].icon = icon;
+        // 若標題仍是預設格式，同步更新標題
+        if (!this.speciesList[idx].title || this.speciesList[idx].title.includes('物種戰作戰指令')) {
+          this.speciesList[idx].title = `【蝸牛之家】${icon} ${name}物種戰作戰指令與重點懶人包`;
+        }
+        this.showToast(`已成功修改物種為【${icon} ${name}】！`);
+      }
+    } else {
+      const newSpecies = {
+        id,
+        name,
+        icon,
+        title: `【蝸牛之家】${icon} ${name}物種戰作戰指令與重點懶人包`,
+        content: `【本週物種】${icon} ${name}\n【活動時間】本週五 05:00 ～ 下週一 04:59\n\n【核心克制與兵種推薦】\n1. 兵種克制：請依本週目標配置克制兵種\n2. 屬性重點：前排防禦與回血續航\n3. 敢死隊成員：請至兵種演練上傳最新陣型\n\n【採集與打王注意事項】\n• 每日物種任務與採集挖礦請積極完成\n• 週六晚間統一集合打王\n\n🐌 蝸牛之家全員出擊，全力衝刺！💪`
+      };
+      this.speciesList.push(newSpecies);
+      this.currentSpeciesId = id;
+      this.showToast(`已成功新增物種【${icon} ${name}】！`);
+    }
+
+    this.saveSpeciesList();
+    this.closeModal('species-edit-modal');
+    this.renderSpeciesSubTabs();
+    this.renderSpeciesTab();
+  }
+
+  /**
+   * 刪除當前物種
+   */
+  deleteCurrentSpecies() {
+    if (this.speciesList.length <= 1) {
+      alert('【防呆保護】公會至少需保留 1 個物種懶人包，無法刪除！');
+      return;
+    }
+
+    const curItem = this.speciesList.find(s => s.id === this.currentSpeciesId);
+    if (!curItem) return;
+
+    if (confirm(`確定要刪除物種【${curItem.icon} ${curItem.name}】嗎？刪除後該物種的所有公告內容將被移除。`)) {
+      this.speciesList = this.speciesList.filter(s => s.id !== curItem.id);
+      this.currentSpeciesId = this.speciesList[0].id;
+      this.saveSpeciesList();
+      this.renderSpeciesSubTabs();
+      this.renderSpeciesTab();
+      this.showToast(`已成功刪除物種【${curItem.name}】！`);
+    }
   }
 
   /**
